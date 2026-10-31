@@ -1,7 +1,7 @@
 ---
 name: Fooocus Modal Worker
-overview: UI Gradio local (CPU) + worker serverless Modal (GPU L4→A10, scale-to-zero). Repo GitHub fooocus-on-modal (MIT). Modelos em Volume; models.txt gitignored; I/O efêmero via ZERO_TELEMETRY.
-updated: 2026-10-30T22:10:00-03:00
+overview: UI Gradio local (CPU) + worker serverless Modal (GPU L4→A10, scale-to-zero). Repo GitHub DragoHG/fooocus-modal (MIT). Modelos em Volume; models.txt gitignored; I/O efêmero via ZERO_TELEMETRY.
+updated: 2026-10-30T22:15:00-03:00
 status: active
 ---
 
@@ -68,4 +68,6 @@ Adiada até solicitação explícita após o scaffold estrutural. Próximos mód
 | GPU | L4 → A10 |
 | I/O mídia | `ZERO_TELEMETRY=true` default |
 | Push | Somente sob ordem explícita |
+| Autor do projeto | Fabio "Drago" Monreal / fabio.monreal@outlook.com / LinkedIn |
+| Repo | https://github.com/DragoHG/fooocus-modal |
 | Autoria git | DragoHG / fabio.monreal@outlook.com |

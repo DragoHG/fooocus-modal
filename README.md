@@ -1,10 +1,17 @@
-# fooocus-on-modal
+# fooocus-modal
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Local Gradio UI for Fooocus-style image generation, backed by a **Modal** serverless GPU worker. Models live on a Modal Volume; the worker **scales to zero** when idle so you only pay for active compute.
 
 > **Status:** Phase 0 — structural and governance scaffold. Runtime worker/UI code is not implemented yet.
+
+## Author
+
+**Fabio "Drago" Monreal**  
+Email: [fabio.monreal@outlook.com](mailto:fabio.monreal@outlook.com)  
+LinkedIn: [linkedin.com/in/fabiomonreal](https://www.linkedin.com/in/fabiomonreal/)  
+GitHub: [DragoHG](https://github.com/DragoHG) · [fooocus-modal](https://github.com/DragoHG/fooocus-modal)
 
 ## Features (planned)
 
@@ -42,7 +49,7 @@ Config highlights from `.env.example`:
 | `ZERO_TELEMETRY` | `true` | Do not store inputs/outputs on the Volume |
 | `SCALEDOWN_WINDOW` | `60` | Idle seconds before GPU scale-down |
 | `MODAL_GPUS` | `L4,A10` | Ordered GPU fallback list |
-| `MODAL_APP_NAME` | `fooocus-on-modal` | Modal app name |
+| `MODAL_APP_NAME` | `fooocus-modal` | Modal app name |
 
 ## Layout
 

@@ -1,7 +1,9 @@
-# Agent guide — fooocus-on-modal
+# Agent guide — fooocus-modal
 
-This repository (`fooocus-on-modal`) runs Fooocus inference on Modal (serverless GPU) with a local Gradio UI.
+This repository (`fooocus-modal`, https://github.com/DragoHG/fooocus-modal) runs Fooocus inference on Modal (serverless GPU) with a local Gradio UI.
 Agents working here must follow project rules under `.cursor/rules/` and skills under `.cursor/skills/`.
+
+**Project author:** Fabio "Drago" Monreal · fabio.monreal@outlook.com · https://www.linkedin.com/in/fabiomonreal/
 
 ## Mission
 

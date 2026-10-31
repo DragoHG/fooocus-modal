@@ -1,6 +1,8 @@
 # Contributing
 
-Thanks for interest in **fooocus-on-modal**. This project is MIT-licensed and welcomes issues and pull requests.
+Thanks for interest in **fooocus-modal**. This project is MIT-licensed and welcomes issues and pull requests.
+
+**Author:** Fabio "Drago" Monreal · [fabio.monreal@outlook.com](mailto:fabio.monreal@outlook.com) · [LinkedIn](https://www.linkedin.com/in/fabiomonreal/)
 
 ## Development sequence
 

@@ -4,6 +4,13 @@ Newest entries first. Format enforced by skill `audit-trail`.
 
 ## [Unreleased]
 
+### 2026-10-30 — Align author and canonical GitHub remote
+
+- **What:** Set project author to Fabio "Drago" Monreal (email + LinkedIn), renamed identity to `fooocus-modal`, pointed canonical remote to `https://github.com/DragoHG/fooocus-modal`.
+- **Why:** Match the published empty GitHub repository and public attribution requested by the maintainer.
+- **Paths:** `README.md`, `LICENSE`, `.env.example`, `AGENTS.md`, `CONTRIBUTING.md`, `SECURITY.md`, `docs/`, `.cursor/rules/00-core.mdc`, `.cursor/skills/project-bootstrap/SKILL.md`, `.cursor/planx/20261030-2215-author-and-remote.md`
+- **Plans:** `.cursor/planx/20261030-2215-author-and-remote.md`
+
 ### 2026-10-30 — GitHub open-source bootstrap (fooocus-on-modal)
 
 - **What:** Renamed project identity to `fooocus-on-modal`, added MIT `LICENSE`, `SECURITY.md`, GitHub PR/issue templates, refreshed README/CONTRIBUTING for public OSS, and aligned Modal app/volume defaults.

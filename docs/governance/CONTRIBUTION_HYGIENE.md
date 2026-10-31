@@ -4,7 +4,7 @@ Short checklist aligned with [POLICY.md](POLICY.md) and [CONTRIBUTING.md](../../
 
 ## Before commit
 
-1. Author is `DragoHG <fabio.monreal@outlook.com>`.
+1. Git author is `DragoHG <fabio.monreal@outlook.com>` (project author: Fabio "Drago" Monreal).
 2. No secrets, `.env`, or private `models.txt`.
 3. Diff reads as normal maintainer work — strip generator banners, IDE footnotes, and “assisted by …” lines if they appear.
 4. Audit changelog updated.

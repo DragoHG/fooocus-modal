@@ -6,9 +6,11 @@ Keep the project maintainable, cost-aware, and safe enough for a single-maintain
 
 ## Roles
 
-- **Maintainer**: DragoHG (`fabio.monreal@outlook.com`) — canonical commit author for maintainer/automation commits on this repository.
+- **Author / maintainer**: Fabio "Drago" Monreal — `fabio.monreal@outlook.com` — [LinkedIn](https://www.linkedin.com/in/fabiomonreal/)
+- **GitHub**: [DragoHG/fooocus-modal](https://github.com/DragoHG/fooocus-modal)
+- **Maintainer git identity** (direct commits): `DragoHG <fabio.monreal@outlook.com>`
 - **License**: MIT (see `LICENSE`).
-- **Canonical remote**: GitHub repository `fooocus-on-modal`.
+- **Canonical remote**: `https://github.com/DragoHG/fooocus-modal.git`
 
 ## Change control
 

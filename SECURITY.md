@@ -6,7 +6,7 @@ This project is under active early development. Security fixes target the defaul
 
 ## Reporting a vulnerability
 
-Please open a **private** security advisory on GitHub when available, or email the maintainer at `fabio.monreal@outlook.com` with:
+Please open a **private** security advisory on GitHub when available, or email the author/maintainer **Fabio "Drago" Monreal** at `fabio.monreal@outlook.com` with:
 
 - A short description of the issue
 - Steps to reproduce (if applicable)

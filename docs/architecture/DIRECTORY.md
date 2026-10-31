@@ -1,7 +1,7 @@
 # Directory map
 
 ```text
-fooocus-on-modal/
+fooocus-modal/
 ├── AGENTS.md                 # Agent entrypoint
 ├── README.md                 # Human overview
 ├── CONTRIBUTING.md           # Contribution and git policy

@@ -1,6 +1,6 @@
 ---
 name: project-bootstrap
-description: Scaffold or extend fooocus-on-modal structural layers (docs, cursor rules/skills, env templates, package layout) before runtime code. Use when bootstrapping the repo, adding governance files, or when the user asks for structural/architectural setup first.
+description: Scaffold or extend fooocus-modal structural layers (docs, cursor rules/skills, env templates, package layout) before runtime code. Use when bootstrapping the repo, adding governance files, or when the user asks for structural/architectural setup first.
 ---
 
 # Project bootstrap
@@ -17,8 +17,10 @@ description: Scaffold or extend fooocus-on-modal structural layers (docs, cursor
 ## Naming
 
 - Ephemeral I/O flag: `ZERO_TELEMETRY`
-- App name default: `fooocus-on-modal`
-- Volume name default: `fooocus-on-modal-data`
+- App name default: `fooocus-modal`
+- Volume name default: `fooocus-modal-data`
+- Canonical GitHub: `https://github.com/DragoHG/fooocus-modal`
+- Project author: Fabio "Drago" Monreal <fabio.monreal@outlook.com>
 
 ## After bootstrap
 

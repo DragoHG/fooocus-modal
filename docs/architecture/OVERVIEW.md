@@ -1,6 +1,8 @@
 # Architecture overview
 
-High-level design for **fooocus-on-modal**: local Gradio UI + Modal serverless GPU worker for Fooocus, optimized for FinOps.
+High-level design for **fooocus-modal**: local Gradio UI + Modal serverless GPU worker for Fooocus, optimized for FinOps.
+
+**Author:** Fabio "Drago" Monreal ([LinkedIn](https://www.linkedin.com/in/fabiomonreal/), fabio.monreal@outlook.com).
 
 ## Goals
 
