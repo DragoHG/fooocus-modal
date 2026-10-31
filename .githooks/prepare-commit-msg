@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Strip tooling co-author trailers injected into the commit message template.
+set -euo pipefail
+
+msg_file="$1"
+tmp="$(mktemp)"
+# Drop Cursor / cursoragent co-author lines and trailing blank runs they leave.
+sed -E \
+  -e '/^[[:space:]]*[Cc]o-[Aa]uthored-[Bb]y:[[:space:]]*Cursor[[:space:]]*<[^>]*>[[:space:]]*$/d' \
+  -e '/^[[:space:]]*[Cc]o-[Aa]uthored-[Bb]y:[[:space:]]*.*cursoragent@/d' \
+  -e '/^[[:space:]]*[Cc]o-[Aa]uthored-[Bb]y:[[:space:]]*.*@cursor\.com/d' \
+  "$msg_file" >"$tmp"
+# Collapse 3+ trailing newlines to a single trailing newline.
+awk 'NF{p=0} !NF{p++; if(p>1) next} {print}' "$tmp" >"$msg_file"
+rm -f "$tmp"
+exit 0

@@ -32,6 +32,20 @@ DragoHG <fabio.monreal@outlook.com>
 git commit --author="DragoHG <fabio.monreal@outlook.com>" -m "message"
 ```
 
+Enable the versioned hooks once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Before any push, commits must pass:
+
+```bash
+scripts/check_git_authorship.sh
+```
+
+The `pre-push` hook runs the same check on every outgoing commit and blocks the push on failure. Do not bypass with `--no-verify`.
+
 ## Maintainer push policy
 
 Do not push to the canonical remote unless the maintainer explicitly requests it for that change set.
@@ -40,5 +54,5 @@ Do not push to the canonical remote unless the maintainer explicitly requests it
 
 - Keep `.env` and `models.txt` gitignored
 - Prefer commit messages that explain why
-- Remove accidental tooling banners or generator footnotes before commit
+- Remove accidental tooling banners, generator footnotes, or co-author trailers before commit
 - Follow [SECURITY.md](SECURITY.md) for vulnerability reports

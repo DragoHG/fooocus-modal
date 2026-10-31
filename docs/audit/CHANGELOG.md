@@ -4,6 +4,19 @@ Newest entries first. Format enforced by skill `audit-trail`.
 
 ## [Unreleased]
 
+### 2026-10-30 — Authorship push gate
+
+- **What:** Added `scripts/check_git_authorship.sh` and versioned `.githooks` (`prepare-commit-msg`, `commit-msg`, `pre-push`) that strip/reject tooling co-author trailers and block pushes unless author/committer is `DragoHG <fabio.monreal@outlook.com>`; tightened the authorship rule, release-hygiene skill, and CONTRIBUTING.
+- **Why:** Canonical history and the GitHub contributor surface must never publish non-maintainer tooling attribution.
+- **Paths:** `scripts/check_git_authorship.sh`, `.githooks/`, `.cursor/rules/10-git-authorship.mdc`, `.cursor/skills/release-hygiene/SKILL.md`, `CONTRIBUTING.md`
+- **Plans:** `.cursor/planx/20261030-2317-authorship-push-gate.md`
+
+### 2026-10-30 — Sole-maintainer commit history hygiene
+
+- **What:** Rewrote published `main` commit messages to remove unintended co-author trailers; tightened the authorship rule to require a clean message body before push.
+- **Why:** Public history must attribute only `DragoHG <fabio.monreal@outlook.com>`.
+- **Paths:** `.cursor/rules/10-git-authorship.mdc`
+
 ### 2026-10-30 — Docs for cold start and auth quickstart
 
 - **What:** Added cold-start architecture note; refreshed README quickstart (venv, `modal token new`, snapshot env vars).
