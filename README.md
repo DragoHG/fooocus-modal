@@ -6,7 +6,7 @@
 
 Models stay on a Modal Volume. Generation media does not have to. Defaults favor FinOps: scale to zero, short idle window, optional zero retention of inputs and outputs on disk.
 
-> **Status:** Runtime scaffold ready — sync models, deploy worker, run local UI. First GPU generation requires Modal auth + `models.txt`.
+> **Status:** Runtime ready — Fooocus-parity local UI, lean Modal worker, Volume sync. Requires Modal token once per machine.
 
 ## Author
 
@@ -22,20 +22,25 @@ Models stay on a Modal Volume. Generation media does not have to. Defaults favor
 
 ## Capabilities
 
-- Local Gradio UI calling an on-demand Modal worker
-- GPU preference `L4` → `A10` (24GB class), overridable
-- Custom model set via private `models.txt` (not committed)
+- Local Fooocus-style UI → lean Modal GPU worker (no Gradio on Modal)
+- Input Image: Upscale/Vary, Image Prompt (**FaceSwap**, Canny, CPDS), Inpaint/Outpaint, Enhance
+- GPU preference `L4` → `A10`; memory snapshots for faster cold starts (`ENABLE_MEMORY_SNAPSHOT`)
+- Custom models via private `models.txt` (default light LoRA + Juggernaut + IP-Adapter assets)
 - `ZERO_TELEMETRY=true` by default — no generation I/O retained on the Volume
+- Default performance **Lightning** for cheaper/faster generations
 
 ## Quick start
 
 ```bash
 cp .env.example .env
-cp models.txt.example models.txt
-# uncomment / add checkpoint + LoRA URLs in models.txt
+cp models.txt.example models.txt   # or edit models.txt
 
-pip install -r requirements-local.txt
-modal setup   # once per machine
+# Prefer a venv (example with uv)
+uv venv .venv && source .venv/bin/activate
+uv pip install -r requirements-local.txt
+
+# Auth once
+modal token new
 
 # 1) Download models into the Modal Volume (CPU)
 modal run modal_app/app.py --action sync
@@ -47,18 +52,21 @@ modal deploy modal_app/app.py
 python local/ui.py
 ```
 
-Open `http://127.0.0.1:7860`, enter a prompt, click **Generate**. The first call may cold-start the GPU; after ~`SCALEDOWN_WINDOW` seconds idle, the worker stops billing compute.
+Open `http://127.0.0.1:7860`. Enable **Input Image** for Fooocus image tools. The first Generate after idle may cold-start; after ~`SCALEDOWN_WINDOW` seconds idle, GPU billing stops.
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `ZERO_TELEMETRY` | `true` | Do not store inputs/outputs on the Volume |
 | `SCALEDOWN_WINDOW` | `60` | Idle seconds before GPU scale-down |
+| `ENABLE_MEMORY_SNAPSHOT` | `true` | Faster cold restore of imports |
+| `ENABLE_GPU_SNAPSHOT` | `false` | Experimental VRAM snapshot (usually off) |
 | `MODAL_GPUS` | `L4,A10` | Ordered GPU fallback list |
 | `MODAL_APP_NAME` | `fooocus-modal` | Modal app name |
 
 ## Documentation
 
 - [Architecture overview](docs/architecture/OVERVIEW.md)
+- [Cold start](docs/architecture/COLD_START.md)
 - [Directory map](docs/architecture/DIRECTORY.md)
 - [ZERO_TELEMETRY](docs/architecture/ZERO_TELEMETRY.md)
 - [Governance](docs/governance/POLICY.md)

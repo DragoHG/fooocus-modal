@@ -1,4 +1,4 @@
-"""Modal app: FinOps Fooocus worker + model sync."""
+"""Modal app: lean FinOps Fooocus worker + model sync."""
 
 from __future__ import annotations
 
@@ -10,13 +10,17 @@ import modal
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Load local .env when present (deploy / local entrypoints).
 try:
     from dotenv import load_dotenv
 
     load_dotenv(ROOT / ".env")
 except Exception:
     pass
+
+
+def _truthy(name: str, default: str = "false") -> bool:
+    return os.environ.get(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
 
 APP_NAME = os.environ.get("MODAL_APP_NAME", "fooocus-modal")
 VOLUME_NAME = os.environ.get("VOLUME_NAME", "fooocus-modal-data")
@@ -27,10 +31,16 @@ MODAL_GPUS = [
     g.strip() for g in os.environ.get("MODAL_GPUS", "L4,A10").split(",") if g.strip()
 ]
 ZERO_TELEMETRY = os.environ.get("ZERO_TELEMETRY", "true")
+ENABLE_MEMORY_SNAPSHOT = _truthy("ENABLE_MEMORY_SNAPSHOT", "true")
+ENABLE_GPU_SNAPSHOT = _truthy("ENSURE_GPU_SNAPSHOT", "false") or _truthy(
+    "ENABLE_GPU_SNAPSHOT", "false"
+)
+ENSURE_RUNTIME_ASSETS = os.environ.get("ENSURE_RUNTIME_ASSETS", "true")
 
 app = modal.App(APP_NAME)
 volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
 
+# Lean GPU image: Fooocus + torch only. No Gradio server process on Modal.
 fooocus_image = (
     modal.Image.from_registry(
         "nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04",
@@ -47,7 +57,6 @@ fooocus_image = (
         "libsm6",
         "libxext6",
         "libxrender1",
-        "ffmpeg",
     )
     .run_commands(
         f"git clone --depth 1 --branch {FOOOCUS_REF} {FOOOCUS_REPO} /opt/Fooocus",
@@ -59,6 +68,9 @@ fooocus_image = (
             "PYTHONPATH": "/app",
             "ZERO_TELEMETRY": ZERO_TELEMETRY,
             "FOOOCUS_VOL_ROOT": "/vol",
+            "ENSURE_RUNTIME_ASSETS": ENSURE_RUNTIME_ASSETS,
+            "HF_HUB_DISABLE_TELEMETRY": "1",
+            "GRADIO_ANALYTICS_ENABLED": "False",
         }
     )
     .add_local_dir(str(ROOT / "src"), remote_path="/app/src")
@@ -94,17 +106,26 @@ def sync_models(manifest_text: str) -> list[dict]:
     return report
 
 
-@app.cls(
-    image=fooocus_image,
-    gpu=MODAL_GPUS or ["L4", "A10"],
-    volumes={"/vol": volume},
-    timeout=60 * 20,
-    scaledown_window=SCALEDOWN_WINDOW,
-    memory=32768,
-)
+_cls_kwargs: dict = {
+    "image": fooocus_image,
+    "gpu": MODAL_GPUS or ["L4", "A10"],
+    "volumes": {"/vol": volume},
+    "timeout": 60 * 20,
+    "scaledown_window": SCALEDOWN_WINDOW,
+    "memory": 32768,
+    "enable_memory_snapshot": ENABLE_MEMORY_SNAPSHOT,
+}
+if ENABLE_GPU_SNAPSHOT:
+    # Experimental: large SDXL snapshots — off by default; enable via .env if desired.
+    _cls_kwargs["experimental_options"] = {"enable_gpu_snapshot": True}
+
+
+@app.cls(**_cls_kwargs)
 class FooocusWorker:
-    @modal.enter()
+    @modal.enter(snap=ENABLE_MEMORY_SNAPSHOT)
     def setup(self) -> None:
+        # When snapshots are on, capture the Fooocus import graph for faster restores.
+        # Checkpoints stay on Volume and load lazily on first generate (lean cold path).
         from modal_app.bootstrap import init_fooocus
 
         init_fooocus()
@@ -133,6 +154,10 @@ class FooocusWorker:
             "checkpoints": _list("checkpoint"),
             "loras": _list("lora"),
             "vae": _list("vae"),
+            "controlnet": _list("controlnet"),
+            "clip_vision": _list("clip_vision"),
+            "inpaint": _list("inpaint"),
+            "upscale": _list("upscale"),
         }
 
     @modal.method()
@@ -157,7 +182,6 @@ class FooocusWorker:
 
 @app.local_entrypoint()
 def main(action: str = "sync") -> None:
-    """Local helpers: `modal run modal_app/app.py --action sync`."""
     if action == "sync":
         manifest = ROOT / "models.txt"
         if not manifest.exists():
@@ -169,7 +193,6 @@ def main(action: str = "sync") -> None:
             print(f"{row['status']:10} {row['kind']:12} {row['path']} ({row['bytes']} bytes)")
         return
     if action == "list":
-        assets = FooocusWorker().list_assets.remote()
-        print(assets)
+        print(FooocusWorker().list_assets.remote())
         return
     raise SystemExit(f"Unknown action: {action}")

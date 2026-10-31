@@ -7,9 +7,11 @@
 ## Goals
 
 - On-demand GPU: cost accrues only while a container runs
+- Lean Modal backend (Fooocus `async_worker` only — no Gradio server in the cloud)
+- Fast cold start via memory snapshots; checkpoints load lazily from the Volume
 - Durable models on a Modal Volume; optional media retention
 - Maintainer-controlled model set via local `models.txt` (not committed)
-- Clear split between local CPU UX and remote inference
+- Local UI exposes Fooocus image tools (vary/upscale, FaceSwap/IP, inpaint/outpaint, enhance)
 
 ## Context diagram
 

@@ -1,7 +1,25 @@
 # type<TAB>relative_filename<TAB>url
-# Copy to models.txt and edit. models.txt is gitignored.
+# Copy to models.txt (gitignored). Prefer syncing once to the Modal Volume.
 #
 # Types: checkpoint, lora, vae, embedding, vae_approx, upscale, inpaint,
 #        controlnet, clip_vision, expansion, safety_checker, sam
 #
+# --- Defaults (SDXL checkpoint is inherently large; LoRA below is tiny) ---
+# Default checkpoint (Fooocus general) — ~6.6GB
 checkpoint	juggernautXL_v8Rundiffusion.safetensors	https://huggingface.co/lllyasviel/fav_models/resolve/main/fav/juggernautXL_v8Rundiffusion.safetensors
+# Default light LoRA (~23MB) — keep weight low (e.g. 0.1) in the UI
+lora	sd_xl_offset_example-lora_1.0.safetensors	https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_offset_example-lora_1.0.safetensors
+#
+# --- Image Prompt / FaceSwap / Canny / CPDS ---
+clip_vision	clip_vision_vit_h.safetensors	https://huggingface.co/lllyasviel/misc/resolve/main/clip_vision_vit_h.safetensors
+controlnet	ip-adapter-plus_sdxl_vit-h.bin	https://huggingface.co/lllyasviel/misc/resolve/main/ip-adapter-plus_sdxl_vit-h.bin
+controlnet	ip-adapter-plus-face_sdxl_vit-h.bin	https://huggingface.co/lllyasviel/misc/resolve/main/ip-adapter-plus-face_sdxl_vit-h.bin
+controlnet	fooocus_ip_negative.safetensors	https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_ip_negative.safetensors
+controlnet	control-lora-canny-rank128.safetensors	https://huggingface.co/lllyasviel/misc/resolve/main/control-lora-canny-rank128.safetensors
+controlnet	fooocus_xl_cpds_128.safetensors	https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_xl_cpds_128.safetensors
+#
+# --- Inpaint / Upscale / Expansion (optional; some are also fetched at runtime) ---
+inpaint	inpaint_v26.fooocus.patch	https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint_v26.fooocus.patch
+upscale	fooocus_upscaler_s409985e5.bin	https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_upscaler_s409985e5.bin
+expansion	pytorch_model.bin	https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_expansion.bin
+vae_approx	xlvaeapp.pth	https://huggingface.co/lllyasviel/misc/resolve/main/xlvaeapp.pth

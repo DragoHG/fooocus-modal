@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import base64
 import random
 import time
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-from .generate_params import GenerateParams, GenerateResult, LoraSpec
+import numpy as np
+from PIL import Image
+
+from .generate_params import GenerateParams, GenerateResult, ImagePromptSlot, LoraSpec
 
 
 def _pad_loras(loras: list[LoraSpec], max_n: int) -> list[LoraSpec]:
@@ -15,6 +20,27 @@ def _pad_loras(loras: list[LoraSpec], max_n: int) -> list[LoraSpec]:
     while len(out) < max_n:
         out.append(LoraSpec(enabled=True, name="None", weight=1.0))
     return out
+
+
+def _b64_to_numpy(image_b64: str | None) -> np.ndarray | None:
+    if not image_b64:
+        return None
+    raw = base64.b64decode(image_b64)
+    img = Image.open(BytesIO(raw)).convert("RGB")
+    return np.array(img)
+
+
+def _inpaint_payload(image_b64: str | None, mask_b64: str | None) -> dict | None:
+    image = _b64_to_numpy(image_b64)
+    if image is None:
+        return None
+    if mask_b64:
+        mask = _b64_to_numpy(mask_b64)
+        if mask is not None and mask.ndim == 3:
+            mask = mask[:, :, 0]
+    else:
+        mask = np.zeros(image.shape[:2], dtype=np.uint8)
+    return {"image": image, "mask": mask}
 
 
 def build_async_task_args(params: GenerateParams) -> list[Any]:
@@ -46,6 +72,21 @@ def build_async_task_args(params: GenerateParams) -> list[Any]:
     max_loras = int(cfg.default_max_lora_number)
     loras = _pad_loras(params.loras, max_loras)
 
+    disabled = flags.disabled if hasattr(flags, "disabled") else "Disabled"
+    uov_method = params.uov_method or disabled
+    if str(uov_method).lower() in {"disabled", "none", ""}:
+        uov_method = disabled
+
+    enhance_uov = params.enhance_uov_method or disabled
+    if str(enhance_uov).lower() in {"disabled", "none", ""}:
+        enhance_uov = disabled
+
+    input_on = bool(params.input_image_checkbox)
+    current_tab = params.current_tab or "uov"
+    if input_on and params.image_prompts and any(s.image_b64 for s in params.image_prompts):
+        if current_tab not in {"ip", "uov", "inpaint", "enhance"}:
+            current_tab = "ip"
+
     args: list[Any] = [
         False,  # generate_image_grid
         params.prompt,
@@ -69,77 +110,98 @@ def build_async_task_args(params: GenerateParams) -> list[Any]:
 
     args.extend(
         [
-            False,  # input_image_checkbox
-            "uov",  # current_tab
-            flags.disabled if hasattr(flags, "disabled") else "Disabled",
-            None,  # uov_input_image
-            [],  # outpaint_selections
-            None,  # inpaint_input_image
-            "",  # inpaint_additional_prompt
-            None,  # inpaint_mask_image
-            True,  # disable_preview
+            input_on,
+            current_tab,
+            uov_method,
+            _b64_to_numpy(params.uov_image_b64),
+            list(params.outpaint_selections or []),
+            _inpaint_payload(params.inpaint_image_b64, params.inpaint_mask_b64),
+            params.inpaint_additional_prompt or "",
+            _b64_to_numpy(params.inpaint_mask_b64),
+            True,  # disable_preview (lean serverless)
             False,  # disable_intermediate_results
             False,  # disable_seed_increment
-            False,  # black_out_nsfw
-            1.5,  # adm_scaler_positive
-            0.8,  # adm_scaler_negative
-            0.5,  # adm_scaler_end
-            float(getattr(cfg, "default_cfg_tsnr", 7.0)),
-            int(getattr(cfg, "default_clip_skip", 2)),
-            getattr(cfg, "default_sampler", "dpmpp_2m_sde_gpu"),
-            getattr(cfg, "default_scheduler", "karras"),
-            getattr(cfg, "default_vae", "Default (model)"),
+            bool(params.black_out_nsfw),
+            float(params.adm_scaler_positive),
+            float(params.adm_scaler_negative),
+            float(params.adm_scaler_end),
+            float(
+                params.adaptive_cfg
+                if params.adaptive_cfg is not None
+                else getattr(cfg, "default_cfg_tsnr", 7.0)
+            ),
+            int(
+                params.clip_skip
+                if params.clip_skip is not None
+                else getattr(cfg, "default_clip_skip", 2)
+            ),
+            params.sampler_name or getattr(cfg, "default_sampler", "dpmpp_2m_sde_gpu"),
+            params.scheduler_name or getattr(cfg, "default_scheduler", "karras"),
+            params.vae_name or getattr(cfg, "default_vae", "Default (model)"),
             int(getattr(cfg, "default_overwrite_step", -1)),
             int(getattr(cfg, "default_overwrite_switch", -1)),
-            -1,  # overwrite_width
-            -1,  # overwrite_height
-            -1,  # overwrite_vary_strength
+            -1,
+            -1,
+            -1,
             float(getattr(cfg, "default_overwrite_upscale", -1)),
-            False,  # mixing_image_prompt_and_vary_upscale
-            False,  # mixing_image_prompt_and_inpaint
-            False,  # debugging_cn_preprocessor
-            False,  # skipping_cn_preprocessor
-            64,  # canny_low_threshold
-            128,  # canny_high_threshold
-            "joint",  # refiner_swap_method
-            0.25,  # controlnet_softness
-            False,  # freeu_enabled
+            bool(params.mixing_image_prompt_and_vary_upscale),
+            bool(params.mixing_image_prompt_and_inpaint),
+            False,
+            False,
+            64,
+            128,
+            "joint",
+            0.25,
+            False,
             1.01,
             1.02,
             0.99,
             0.95,
-            False,  # debugging_inpaint_preprocessor
-            False,  # inpaint_disable_initial_latent
-            getattr(cfg, "default_inpaint_engine_version", "v2.6"),
-            1.0,  # inpaint_strength
-            0.618,  # inpaint_respective_field
-            False,  # inpaint_advanced_masking_checkbox
-            False,  # invert_mask_checkbox
-            0,  # inpaint_erode_or_dilate
+            False,
+            False,
+            params.inpaint_engine or getattr(cfg, "default_inpaint_engine_version", "v2.6"),
+            float(params.inpaint_strength),
+            float(params.inpaint_respective_field),
+            bool(params.inpaint_mask_b64),
+            False,
+            0,
         ]
     )
 
     import args_manager
 
     if not args_manager.args.disable_image_log:
-        args.append(False)  # save_final_enhanced_image_only
+        args.append(False)
     if not args_manager.args.disable_metadata:
         scheme = flags.MetadataScheme.FOOOCUS
         args.extend([False, scheme.value if hasattr(scheme, "value") else scheme])
 
     cn_count = int(getattr(cfg, "default_controlnet_image_count", 4))
     default_ip = getattr(flags, "default_ip", None) or flags.ip_list[0]
-    for _ in range(cn_count):
-        args.extend([None, 0.5, 0.6, default_ip])
+    slots = list(params.image_prompts or [])
+    while len(slots) < cn_count:
+        slots.append(ImagePromptSlot())
+    for slot in slots[:cn_count]:
+        ip_type = slot.type or default_ip
+        if ip_type not in getattr(flags, "ip_list", [ip_type]):
+            ip_type = default_ip
+        args.extend(
+            [
+                _b64_to_numpy(slot.image_b64),
+                float(slot.stop),
+                float(slot.weight),
+                ip_type,
+            ]
+        )
 
     args.extend(
         [
-            False,  # debugging_dino
-            0,  # dino_erode_or_dilate
-            False,  # debugging_enhance_masks_checkbox
-            None,  # enhance_input_image
-            False,  # enhance_checkbox
-            flags.disabled if hasattr(flags, "disabled") else "Disabled",
+            False,
+            0,
+            False,
+            _b64_to_numpy(params.enhance_image_b64),
+            bool(params.enhance_checkbox),
+            enhance_uov,
             getattr(cfg, "default_enhance_uov_processing_order", "Before First Enhancement"),
             getattr(cfg, "default_enhance_uov_prompt_type", "Original Prompt"),
         ]
@@ -149,22 +211,22 @@ def build_async_task_args(params: GenerateParams) -> list[Any]:
     for _ in range(enhance_tabs):
         args.extend(
             [
-                False,  # enhance_enabled
-                "",  # mask dino prompt
-                "",  # enhance prompt
-                "",  # enhance negative
+                False,
+                "",
+                "",
+                "",
                 getattr(cfg, "default_enhance_inpaint_mask_model", "sam"),
-                "full",  # cloth category
-                "vit_b",  # sam model
-                0.25,  # text threshold
-                0.3,  # box threshold
-                0,  # sam max detections
-                False,  # disable initial latent
+                "full",
+                "vit_b",
+                0.25,
+                0.3,
+                0,
+                False,
                 getattr(cfg, "default_inpaint_engine_version", "v2.6"),
                 1.0,
                 0.618,
                 0,
-                False,  # mask invert
+                False,
             ]
         )
 
@@ -172,11 +234,6 @@ def build_async_task_args(params: GenerateParams) -> list[Any]:
 
 
 def _to_png_bytes(item: Any) -> bytes:
-    from io import BytesIO
-
-    from PIL import Image
-    import numpy as np
-
     if isinstance(item, (bytes, bytearray)):
         return bytes(item)
     if isinstance(item, str) and Path(item).exists():
@@ -218,10 +275,7 @@ def run_generation(params: GenerateParams) -> GenerateResult:
             finished = True
 
     images = [_to_png_bytes(x) for x in product]
-    paths: list[str] = []
-    for x in product:
-        if isinstance(x, str):
-            paths.append(x)
+    paths = [x for x in product if isinstance(x, str)]
 
     gpu_name = ""
     try:
@@ -240,5 +294,10 @@ def run_generation(params: GenerateParams) -> GenerateResult:
         elapsed_sec=time.perf_counter() - started,
         gpu_name=gpu_name,
         paths=paths,
-        meta={"prompt": params.prompt, "base_model": params.base_model},
+        meta={
+            "prompt": params.prompt,
+            "base_model": params.base_model,
+            "performance": params.performance,
+            "tab": params.current_tab if params.input_image_checkbox else "txt2img",
+        },
     )

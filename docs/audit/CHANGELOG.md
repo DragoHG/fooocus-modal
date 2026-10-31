@@ -4,6 +4,19 @@ Newest entries first. Format enforced by skill `audit-trail`.
 
 ## [Unreleased]
 
+### 2026-10-30 — Docs for cold start and auth quickstart
+
+- **What:** Added cold-start architecture note; refreshed README quickstart (venv, `modal token new`, snapshot env vars).
+- **Why:** Document FinOps cold-start knobs and first-time Modal auth before sync/deploy.
+- **Paths:** `README.md`, `docs/architecture/COLD_START.md`, `.env.example`
+
+### 2026-10-30 — Full Fooocus image tools + lean cold start
+
+- **What:** Expanded local UI (Upscale/Vary, Image Prompt/FaceSwap, Inpaint/Outpaint, Enhance, 5 LoRAs); wired image params through the worker; enabled memory snapshots and lean Modal bootstrap; refreshed model manifests with default checkpoint + light LoRA and IP-Adapter assets.
+- **Why:** Match Fooocus feature surface while keeping Modal cold starts focused on inference-only backend.
+- **Paths:** `local/ui.py`, `src/generate_params.py`, `src/fooocus_task.py`, `modal_app/app.py`, `modal_app/bootstrap.py`, `models.txt.example`, `.env.example`
+- **Plans:** `.cursor/planx/20261030-2248-full-ui-coldstart.md`
+
 ### 2026-10-30 — Runtime worker, sync, and local UI
 
 - **What:** Implemented shared path/manifest/params helpers, Modal `FooocusWorker` + `sync_models`, Fooocus headless task runner, and local Gradio UI calling `.remote()`.
