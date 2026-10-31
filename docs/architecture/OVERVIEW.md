@@ -1,15 +1,15 @@
 # Architecture overview
 
-High-level design for **fooocus-modal**: local Gradio UI + Modal serverless GPU worker for Fooocus, optimized for FinOps.
+**fooocus-modal** separates a local Gradio UI from a Modal serverless GPU worker for Fooocus, with FinOps as the default operating mode.
 
-**Author:** Fabio "Drago" Monreal ([LinkedIn](https://www.linkedin.com/in/fabiomonreal/), fabio.monreal@outlook.com).
+**Author:** Fabio "Drago" Monreal — [LinkedIn](https://www.linkedin.com/in/fabiomonreal/) · [Website](https://fabio-monreal.vercel.app/en) · fabio.monreal@outlook.com
 
 ## Goals
 
-- On-demand GPU: cost accrues only while a container runs.
-- Persistent models on a Modal Volume; media retention optional.
-- Maintainer-controlled model set via local `models.txt` (not committed).
-- Clear separation between local CPU UX and remote inference.
+- On-demand GPU: cost accrues only while a container runs
+- Durable models on a Modal Volume; optional media retention
+- Maintainer-controlled model set via local `models.txt` (not committed)
+- Clear split between local CPU UX and remote inference
 
 ## Context diagram
 
@@ -22,7 +22,7 @@ flowchart LR
   end
   subgraph modalPlatform [Modal]
     Worker[FooocusWorker]
-    Vol[Volume fooocus-data]
+    Vol[Volume fooocus-modal-data]
   end
   UI -->|generate remote| Worker
   Manifest -->|sync_models| Vol
@@ -35,10 +35,10 @@ flowchart LR
 ## Runtime lifecycle
 
 1. User clicks **Generate** in the local UI.
-2. Client calls the deployed Modal class method (cold start if idle).
-3. Worker reads checkpoints/LoRAs from the Volume, runs Fooocus headless, returns bytes.
+2. Client invokes the deployed Modal class method (cold start if idle).
+3. Worker loads checkpoints/LoRAs from the Volume, runs Fooocus headless, returns bytes.
 4. After `SCALEDOWN_WINDOW` with no work, containers scale to zero — GPU billing stops.
-5. Volume storage for models remains; with `ZERO_TELEMETRY=true`, generation media is not kept on the Volume.
+5. Model storage on the Volume remains; with `ZERO_TELEMETRY=true`, generation media is not kept on the Volume.
 
 ## Components (planned)
 
@@ -58,7 +58,7 @@ See `.env.example`. Notable keys:
 - `MODAL_GPUS` — ordered fallback list (default `L4,A10`)
 - `SCALEDOWN_WINDOW` — idle seconds before scale-down (default `60`)
 - `ZERO_TELEMETRY` — when `true`, do not persist inputs/outputs on the Volume
-- `VOLUME_NAME` / `MODAL_APP_NAME` — Modal resource names
+- `VOLUME_NAME` / `MODAL_APP_NAME` — Modal resource names (`fooocus-modal-data` / `fooocus-modal`)
 
 ## Non-goals (phase 0)
 

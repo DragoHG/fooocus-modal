@@ -6,7 +6,7 @@ Keep the project maintainable, cost-aware, and safe enough for a single-maintain
 
 ## Roles
 
-- **Author / maintainer**: Fabio "Drago" Monreal — `fabio.monreal@outlook.com` — [LinkedIn](https://www.linkedin.com/in/fabiomonreal/)
+- **Author / maintainer**: Fabio "Drago" Monreal — `fabio.monreal@outlook.com` — [LinkedIn](https://www.linkedin.com/in/fabiomonreal/) — [Website](https://fabio-monreal.vercel.app/en)
 - **GitHub**: [DragoHG/fooocus-modal](https://github.com/DragoHG/fooocus-modal)
 - **Maintainer git identity** (direct commits): `DragoHG <fabio.monreal@outlook.com>`
 - **License**: MIT (see `LICENSE`).

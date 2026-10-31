@@ -1,17 +1,17 @@
 # ZERO_TELEMETRY
 
-Environment flag controlling retention of **generation media** (inputs/outputs) on the Modal Volume.
+Controls whether **generation media** (inputs/outputs) is retained on the Modal Volume. Model weights are always durable on the Volume.
 
 | Value | Behavior |
 |-------|----------|
-| `true` (default) | Worker uses ephemeral paths; returns image bytes to the local UI; does not keep inputs/outputs on the Volume. |
-| `false` | Worker may write inputs/outputs under Volume directories (durable, increases storage). |
+| `true` (default) | Ephemeral worker paths; image bytes returned to the local UI; no inputs/outputs kept on the Volume |
+| `false` | Inputs/outputs may be written under Volume directories (durable; increases storage) |
 
 ## Unaffected
 
-- Model weights (checkpoints, LoRAs, VAE, etc.) remain on the Volume in both modes.
-- Local saves under `./outputs` on the workstation are independent of this flag.
+- Checkpoints, LoRAs, VAE, and related weights stay on the Volume in both modes
+- Local saves under `./outputs` on the workstation are independent of this flag
 
 ## Logging
 
-When `true`, avoid logging prompts or image payloads on the worker beyond what is required to serve the request.
+When `true`, do not log prompts or image payloads on the worker beyond what is required to serve the request.

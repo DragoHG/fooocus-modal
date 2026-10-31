@@ -2,19 +2,19 @@
 
 ## Supported versions
 
-This project is under active early development. Security fixes target the default branch.
+Security fixes target the default branch while the project is in early development.
 
 ## Reporting a vulnerability
 
-Please open a **private** security advisory on GitHub when available, or email the author/maintainer **Fabio "Drago" Monreal** at `fabio.monreal@outlook.com` with:
+Prefer a private GitHub security advisory when available. Otherwise contact **Fabio "Drago" Monreal** at [fabio.monreal@outlook.com](mailto:fabio.monreal@outlook.com) with:
 
-- A short description of the issue
-- Steps to reproduce (if applicable)
-- Impact assessment
+- Short description
+- Reproduction steps (if applicable)
+- Likely impact
 
-Do not open a public issue for unfixed vulnerabilities that could expose credentials, Modal tokens, or Volume contents.
+Do not open a public issue for unfixed issues that could expose credentials, Modal tokens, or Volume contents.
 
-## Operational notes
+## Operational guidance
 
-- Never commit `.env`, Modal tokens, or a private `models.txt` with non-public URLs if that matters to you.
-- Prefer `ZERO_TELEMETRY=true` unless you intentionally retain generation media on the Volume.
+- Never commit `.env`, Modal tokens, or sensitive model URLs in `models.txt`
+- Prefer `ZERO_TELEMETRY=true` unless you intentionally retain generation media on the Volume

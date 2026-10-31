@@ -4,6 +4,12 @@ Newest entries first. Format enforced by skill `audit-trail`.
 
 ## [Unreleased]
 
+### 2026-10-30 — Executive public copy and Website attribution
+
+- **What:** Rewrote public-facing README/CONTRIBUTING/SECURITY/AUTHORS with executive tone; labeled the personal site as Website (not curriculum); aligned architecture/governance wording and Volume name in diagrams.
+- **Why:** Clearer product narrative for GitHub visitors while keeping agent docs operational.
+- **Paths:** `README.md`, `AUTHORS.md`, `CONTRIBUTING.md`, `SECURITY.md`, `docs/architecture/OVERVIEW.md`, `docs/architecture/ZERO_TELEMETRY.md`, `docs/governance/POLICY.md`, `AGENTS.md`
+
 ### 2026-10-30 — Align author and canonical GitHub remote
 
 - **What:** Set project author to Fabio "Drago" Monreal (email + LinkedIn), renamed identity to `fooocus-modal`, pointed canonical remote to `https://github.com/DragoHG/fooocus-modal`.
