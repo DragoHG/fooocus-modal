@@ -26,7 +26,8 @@ APP_NAME = os.environ.get("MODAL_APP_NAME", "fooocus-modal")
 VOLUME_NAME = os.environ.get("VOLUME_NAME", "fooocus-modal-data")
 FOOOCUS_REPO = os.environ.get("FOOOCUS_REPO", "https://github.com/lllyasviel/Fooocus.git")
 FOOOCUS_REF = os.environ.get("FOOOCUS_REF", "main")
-SCALEDOWN_WINDOW = int(os.environ.get("SCALEDOWN_WINDOW", "30"))
+# Keep idle GPU warm only briefly. Long warm pools burn credits.
+SCALEDOWN_WINDOW = int(os.environ.get("SCALEDOWN_WINDOW", "15"))
 MODAL_GPUS = [
     g.strip() for g in os.environ.get("MODAL_GPUS", "L4,A10").split(",") if g.strip()
 ]

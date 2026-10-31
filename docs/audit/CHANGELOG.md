@@ -4,6 +4,12 @@ Newest entries first. Format enforced by skill `audit-trail`.
 
 ## [Unreleased]
 
+### 2026-10-30 - Shorter GPU scaledown default
+
+- **What:** Default `SCALEDOWN_WINDOW` set to 15s; documented stop/redeploy if a container stays live after idle.
+- **Why:** Warm GPU after the last generate was lasting longer than intended and burning credits.
+- **Paths:** `modal_app/app.py`, `.env.example`, `docs/architecture/COLD_START.md`, `README.md`
+
 ### 2026-10-30 - Stop GPU burn from snapshots and list_assets
 
 - **What:** Hard-disabled memory snapshots (Fooocus CUDA init fails in CPU snap enter and retries); moved `list_assets` to a CPU Modal function; shortened scale-down; headless Gradio stub; documented cost traps and verification (one Lightning generate OK).

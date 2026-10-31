@@ -41,7 +41,7 @@ The first Generate after idle may take about 1-2 minutes (container start + mode
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `ZERO_TELEMETRY` | `true` | Keep generation media off the Volume |
-| `SCALEDOWN_WINDOW` | `30` | Seconds idle before the GPU stops |
+| `SCALEDOWN_WINDOW` | `15` | Seconds idle before the GPU stops |
 | `GENERATE_TIMEOUT` | `600` | Max seconds for one generate |
 | `ENABLE_MEMORY_SNAPSHOT` | `false` | Keep off (unsafe with Fooocus CUDA init) |
 | `MODAL_GPUS` | `L4,A10` | GPU preference order |

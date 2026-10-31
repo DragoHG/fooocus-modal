@@ -9,7 +9,7 @@ The Modal worker is inference-only: Fooocus `async_worker`, no Gradio server in 
 | CPU memory snapshot enter | `@enter(snap=True)` has **no GPU**; Fooocus import needs CUDA → `No CUDA GPUs are available`, retries, billed time | Snapshots hard-disabled in `modal_app/app.py` |
 | `list_assets` on GPU class | Listing files woke an L4/A10 | `list_assets` is a **CPU** Modal function |
 | Hung `generate` | Worker thread died (missing expansion tokenizer) but call stayed Running | Copy tokenizer sidecars; generation timeout; cancel stuck calls |
-| Long idle window | GPU stayed warm after failures | Default `SCALEDOWN_WINDOW=30` |
+| Long idle window | GPU stayed warm after jobs | Default `SCALEDOWN_WINDOW=15`; use `modal app stop fooocus-modal` if a container stays live |
 
 ## Defaults
 
@@ -18,7 +18,7 @@ The Modal worker is inference-only: Fooocus `async_worker`, no Gradio server in 
 | `ENABLE_MEMORY_SNAPSHOT` | `false` | Do not use (unsafe with Fooocus CUDA init) |
 | `ENABLE_GPU_SNAPSHOT` | `false` | Leave off |
 | `ENSURE_RUNTIME_ASSETS` | `true` | Copy/download tiny expansion + VAE-approx if missing |
-| `SCALEDOWN_WINDOW` | `30` | Idle seconds before scale-to-zero |
+| `SCALEDOWN_WINDOW` | `15` | Idle seconds before scale-to-zero |
 | `GENERATE_TIMEOUT` | `600` | Max seconds for one generate |
 | `ZERO_TELEMETRY` | `true` | Do not retain generation media on the Volume |
 
