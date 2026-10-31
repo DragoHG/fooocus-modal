@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 import sys
 import time
+import zipfile
 from io import BytesIO
 from pathlib import Path
 
@@ -104,6 +106,247 @@ SAMPLER_CHOICES = [
 SCHEDULER_CHOICES = ["Default", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform", "normal"]
 VAE_CHOICES = ["Default (model)"]
 INPAINT_ENGINES = ["v2.6", "v1"]
+
+MAX_HISTORY = 48
+
+UI_CSS = """
+#action-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: var(--body-background-fill, #0b1220);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color-primary, #333);
+  margin-bottom: 8px;
+}
+#action-bar .generate-btn button {
+  min-width: 140px;
+  font-weight: 700;
+}
+#results-panel {
+  position: sticky;
+  top: 70px;
+  align-self: flex-start;
+}
+#result-thumbs {
+  max-height: 160px !important;
+}
+#result-viewer {
+  cursor: zoom-in;
+}
+/* Only style when Gradio shows the panel. Never force display with !important. */
+#fm-fullscreen:not(.hide):not([hidden]) {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 100000 !important;
+  background: rgba(0, 0, 0, 0.88) !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px !important;
+  box-sizing: border-box !important;
+  cursor: zoom-out;
+  overflow: auto !important;
+}
+#fm-fullscreen .fm-fs-inner {
+  cursor: default;
+  max-width: min(96vw, 1400px);
+  width: 100%;
+}
+@media (max-width: 960px) {
+  #main-row { flex-direction: column !important; }
+  #results-panel { position: static !important; width: 100% !important; }
+  #action-bar .generate-btn button { width: 100%; }
+}
+"""
+
+CACHE_KEY = "fooocus-modal-cache-v1"
+
+UI_JS = f"""
+() => {{
+  const KEY = "{CACHE_KEY}";
+
+  const cacheEl = () => document.querySelector("#fm-cache-box textarea, #fm-cache-box input");
+
+  const saveCacheFromBox = () => {{
+    const el = cacheEl();
+    if (el && typeof el.value === "string" && el.value.length > 2) {{
+      try {{ localStorage.setItem(KEY, el.value); }} catch (err) {{}}
+    }}
+  }};
+
+  const injectCacheToBox = () => {{
+    const el = cacheEl();
+    if (!el) return false;
+    let raw = null;
+    try {{ raw = localStorage.getItem(KEY); }} catch (err) {{ return false; }}
+    if (!raw) return false;
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype, "value"
+    )?.set || Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype, "value"
+    )?.set;
+    if (setter) setter.call(el, raw);
+    else el.value = raw;
+    el.dispatchEvent(new Event("input", {{ bubbles: true }}));
+    el.dispatchEvent(new Event("change", {{ bubbles: true }}));
+    const btn = document.querySelector("#fm-cache-restore button");
+    if (btn) btn.click();
+    return true;
+  }};
+
+  const bindFsClose = () => {{
+    const root = document.getElementById("fm-fullscreen");
+    if (!root || root.dataset.fmBound === "1") return;
+    root.dataset.fmBound = "1";
+    root.addEventListener("click", (e) => {{
+      if (e.target === root) {{
+        document.querySelector("#fm-fs-close button")?.click();
+      }}
+    }});
+  }};
+
+  const bindViewerZoom = () => {{
+    const root = document.querySelector("#result-viewer");
+    if (!root || root.dataset.clickBound === "1") return;
+    root.dataset.clickBound = "1";
+    root.addEventListener("click", (e) => {{
+      if (e.target.closest("a, button, .download, label")) return;
+      document.querySelector("#fm-fs-open button")?.click();
+    }});
+  }};
+
+  const bindCacheWatch = () => {{
+    const el = cacheEl();
+    if (!el || el.dataset.cacheBound === "1") return;
+    el.dataset.cacheBound = "1";
+    el.addEventListener("input", saveCacheFromBox);
+    el.addEventListener("change", saveCacheFromBox);
+  }};
+
+  const boot = () => {{
+    bindFsClose();
+    bindViewerZoom();
+    bindCacheWatch();
+    injectCacheToBox();
+  }};
+
+  const obs = new MutationObserver(() => {{
+    bindFsClose();
+    bindViewerZoom();
+    bindCacheWatch();
+  }});
+  obs.observe(document.body, {{ childList: true, subtree: true }});
+  document.addEventListener("keydown", (e) => {{
+    if (e.key !== "Escape") return;
+    const root = document.getElementById("fm-fullscreen");
+    if (!root || root.classList.contains("hide") || root.style.display === "none") return;
+    document.querySelector("#fm-fs-close button")?.click();
+  }});
+  setTimeout(boot, 400);
+  setTimeout(boot, 1200);
+}}
+"""
+
+
+def _alive_paths(paths: list | None) -> list[str]:
+    out: list[str] = []
+    for p in paths or []:
+        if p and Path(str(p)).is_file():
+            out.append(str(p))
+    return out
+
+
+def _nav_label(index: int, total: int) -> str:
+    if total <= 0:
+        return "0 / 0"
+    return f"{index + 1} / {total}"
+
+
+def _pick_choices(history: list[str]) -> list[tuple[str, str]]:
+    choices: list[tuple[str, str]] = []
+    for i, path in enumerate(history):
+        choices.append((f"{i + 1}. {Path(path).name}", path))
+    return choices
+
+
+def _cache_payload(history: list[str], index: int, picked: list[str]) -> str:
+    return json.dumps(
+        {
+            "version": 1,
+            "history": _alive_paths(history),
+            "index": int(index or 0),
+            "picked": _alive_paths(picked),
+        },
+        ensure_ascii=True,
+    )
+
+
+def _parse_cache(raw: str | None) -> tuple[list[str], int, list[str]]:
+    if not raw or not str(raw).strip():
+        return [], 0, []
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return [], 0, []
+    history = _alive_paths(data.get("history") or [])
+    picked = [p for p in _alive_paths(data.get("picked") or []) if p in set(history)]
+    index = int(data.get("index") or 0)
+    if history:
+        index = max(0, min(index, len(history) - 1))
+    else:
+        index = 0
+    return history, index, picked
+
+
+def _viewer_bundle(history: list[str], index: int, picked: list[str] | None = None):
+    history = _alive_paths(history)
+    picked = [p for p in _alive_paths(picked) if p in set(history)]
+    if not history:
+        return (
+            [],
+            0,
+            gr.update(value=None),
+            None,
+            None,
+            "0 / 0",
+            gr.update(interactive=False),
+            gr.update(interactive=False),
+            [],
+            gr.update(choices=[], value=[]),
+            "Marked: 0",
+            _cache_payload([], 0, []),
+        )
+    index = max(0, min(int(index), len(history) - 1))
+    selected = history[index]
+    cols = 1 if len(history) == 1 else (2 if len(history) <= 6 else 3)
+    marked = selected in set(picked)
+    return (
+        history,
+        index,
+        gr.update(value=history, columns=cols),
+        selected,
+        selected,
+        _nav_label(index, len(history)),
+        gr.update(interactive=len(history) > 1),
+        gr.update(interactive=len(history) > 1),
+        picked,
+        gr.update(choices=_pick_choices(history), value=picked),
+        f"Marked: {len(picked)}" + (" · current marked" if marked else ""),
+        _cache_payload(history, index, picked),
+    )
+
+
+def _zip_picked(picked: list[str]) -> str:
+    paths = _alive_paths(picked)
+    if not paths:
+        raise gr.Error("Mark at least one image before downloading the selection.")
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    zip_path = OUTPUT_DIR / f"selection_{int(time.time())}.zip"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for path in paths:
+            zf.write(path, arcname=Path(path).name)
+    return str(zip_path)
 
 
 def _pil_to_b64(img: Image.Image | None) -> str | None:
@@ -328,18 +571,18 @@ def generate(
     if not images_b64:
         raise gr.Error("Worker returned no images.")
 
-    images: list[Image.Image] = []
+    paths: list[str] = []
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = int(time.time())
+    ext = (output_format or "png").lower()
+    if ext == "jpeg":
+        ext = "jpg"
     for idx, b64 in enumerate(images_b64):
         raw = base64.b64decode(b64)
-        img = Image.open(BytesIO(raw)).convert("RGB")
-        images.append(img)
-        if save_local:
-            stamp = int(time.time())
-            ext = (output_format or "png").lower()
-            if ext == "jpeg":
-                ext = "jpg"
-            (OUTPUT_DIR / f"{stamp}_{result.get('seed', 0)}_{idx}.{ext}").write_bytes(raw)
+        path = OUTPUT_DIR / f"{stamp}_{result.get('seed', 0)}_{idx}.{ext}"
+        # File paths keep the Gradio viewer light (no giant PIL blobs in State).
+        path.write_bytes(raw)
+        paths.append(str(path))
 
     elapsed = time.perf_counter() - started
     info = (
@@ -347,7 +590,7 @@ def generate(
         f"worker={result.get('elapsed_sec', 0):.1f}s · roundtrip={elapsed:.1f}s · "
         f"mode={result.get('meta', {}).get('tab', 'txt2img')}"
     )
-    return images, info
+    return paths, info
 
 
 def _ip_block(idx: int):
@@ -366,15 +609,35 @@ def build_ui() -> gr.Blocks:
     checkpoints, loras = list_remote_assets()
     default_lora = DEFAULT_LORA if DEFAULT_LORA in loras else "None"
 
-    with gr.Blocks(title="fooocus-modal") as demo:
-        gr.Markdown(
-            "# fooocus-modal\n"
-            "Create images from your machine. GPUs run on demand and shut down when idle, "
-            "so you pay for work, not waiting. Save your setup as JSON and load it next time."
-        )
-        with gr.Row():
-            with gr.Column(scale=3):
-                prompt = gr.Textbox(label="Prompt", lines=3, placeholder="Describe the image")
+    with gr.Blocks(title="fooocus-modal", css=UI_CSS, js=UI_JS) as demo:
+        history_state = gr.State([])  # all result file paths this session
+        index_state = gr.State(0)
+        picked_state = gr.State([])  # marked paths for multi-download (persisted)
+
+        with gr.Group(elem_id="action-bar"):
+            gr.Markdown(
+                "**fooocus-modal** · Queued Generate keeps history. Click Selected to fullscreen "
+                "(click outside / Esc to close). Mark favorites for ZIP download; cache survives reload."
+            )
+            with gr.Row():
+                prompt = gr.Textbox(
+                    label="Prompt",
+                    lines=2,
+                    placeholder="Describe the image",
+                    scale=5,
+                )
+                with gr.Column(scale=2, min_width=200, elem_classes=["generate-btn"]):
+                    go = gr.Button("Generate", variant="primary", size="lg")
+                    refresh = gr.Button("Refresh models", size="sm")
+            queue_status = gr.Textbox(
+                label="Queue / status",
+                value="Idle - jobs queue one after another; history is kept.",
+                interactive=False,
+                lines=1,
+            )
+
+        with gr.Row(elem_id="main-row"):
+            with gr.Column(scale=6):
                 negative = gr.Textbox(label="Negative prompt", lines=2)
                 styles = gr.Dropdown(
                     STYLE_CHOICES, value=STYLE_DEFAULT, multiselect=True, label="Styles"
@@ -503,7 +766,7 @@ def build_ui() -> gr.Blocks:
                     outputs=image_panel,
                 )
 
-                with gr.Accordion("Presets (save / load JSON)", open=True):
+                with gr.Accordion("Presets (save / load JSON)", open=False):
                     gr.Markdown(
                         "Download your current settings as JSON. Upload the file later to "
                         "restore them. Images are optional (makes the file larger)."
@@ -524,15 +787,86 @@ def build_ui() -> gr.Blocks:
                     preset_status = gr.Textbox(label="Preset status", interactive=False)
 
                 save_local = gr.Checkbox(value=True, label=f"Save results to {OUTPUT_DIR}")
+
+            with gr.Column(scale=5, elem_id="results-panel"):
+                gr.Markdown("### Results")
+                thumbs = gr.Gallery(
+                    label="Session thumbnails (click to select)",
+                    elem_id="result-thumbs",
+                    columns=3,
+                    height=150,
+                    object_fit="cover",
+                    preview=False,
+                    allow_preview=False,
+                    show_download_button=False,
+                    show_share_button=False,
+                )
+                viewer = gr.Image(
+                    label="Selected (click image to fullscreen)",
+                    elem_id="result-viewer",
+                    type="filepath",
+                    height=380,
+                    show_download_button=True,
+                    interactive=False,
+                )
                 with gr.Row():
-                    refresh = gr.Button("Refresh models")
-                    go = gr.Button("Generate", variant="primary")
+                    prev_btn = gr.Button("← Prev", size="sm")
+                    nav_label = gr.Textbox(
+                        value="0 / 0",
+                        label="Image",
+                        interactive=False,
+                        max_lines=1,
+                        scale=1,
+                    )
+                    next_btn = gr.Button("Next →", size="sm")
+                with gr.Row():
+                    fs_open = gr.Button("Fullscreen", size="sm", elem_id="fm-fs-open")
+                    mark_btn = gr.Button("Mark / unmark", size="sm")
+                    download_file = gr.File(label="Download current", interactive=False)
+                    clear_result = gr.Button("Clear session", size="sm")
+                pick_status = gr.Textbox(
+                    value="Marked: 0",
+                    label="Selection",
+                    interactive=False,
+                    max_lines=1,
+                )
+                pick_box = gr.CheckboxGroup(
+                    label="Marked for ZIP download (survives nav / reload)",
+                    choices=[],
+                    value=[],
+                )
+                with gr.Row():
+                    download_zip_btn = gr.Button("Download marked ZIP", variant="secondary")
+                    clear_marks_btn = gr.Button("Clear marks", size="sm")
+                zip_file = gr.File(label="Marked ZIP", interactive=False)
+                status = gr.Textbox(label="Last job", interactive=False, lines=2)
+                cache_box = gr.Textbox(
+                    value="",
+                    visible=False,
+                    elem_id="fm-cache-box",
+                    label="cache",
+                )
+                cache_restore = gr.Button(
+                    "Restore cache",
+                    visible=False,
+                    elem_id="fm-cache-restore",
+                )
 
-            with gr.Column(scale=2):
-                gallery = gr.Gallery(label="Results", columns=2, height=720)
-                status = gr.Textbox(label="Status", interactive=False)
+        with gr.Column(visible=False, elem_id="fm-fullscreen") as fs_panel:
+            with gr.Column(elem_classes=["fm-fs-inner"]):
+                fs_image = gr.Image(
+                    label="Fullscreen",
+                    type="filepath",
+                    height=720,
+                    show_download_button=True,
+                    interactive=False,
+                )
+                with gr.Row():
+                    fs_prev = gr.Button("← Prev", size="sm")
+                    fs_nav = gr.Textbox(value="0 / 0", interactive=False, max_lines=1)
+                    fs_next = gr.Button("Next →", size="sm")
+                    fs_close = gr.Button("Close (Esc / click outside)", elem_id="fm-fs-close")
 
-        # Ordered list of setting controls for preset export/import (must match SETTING_KEYS).
         setting_controls = [
             prompt,
             negative,
@@ -605,6 +939,65 @@ def build_ui() -> gr.Blocks:
         ]
         assert len(image_controls) == len(IMAGE_KEYS)
 
+        generate_inputs = [
+            prompt,
+            negative,
+            styles,
+            performance,
+            aspect,
+            image_number,
+            seed,
+            sharpness,
+            guidance,
+            base_model,
+            refiner_model,
+            refiner_switch,
+            *lora_ctrls,
+            input_image_on,
+            uov_method,
+            uov_image,
+            ip1_image,
+            ip1_type,
+            ip1_stop,
+            ip1_weight,
+            ip2_image,
+            ip2_type,
+            ip2_stop,
+            ip2_weight,
+            ip3_image,
+            ip3_type,
+            ip3_stop,
+            ip3_weight,
+            ip4_image,
+            ip4_type,
+            ip4_stop,
+            ip4_weight,
+            mix_ip_uov,
+            mix_ip_inpaint,
+            inpaint_image,
+            inpaint_mask,
+            inpaint_prompt,
+            inpaint_strength,
+            inpaint_field,
+            inpaint_engine,
+            outpaint,
+            enhance_on,
+            enhance_image,
+            enhance_uov,
+            output_format,
+            read_wildcards,
+            black_out_nsfw,
+            sampler_name,
+            scheduler_name,
+            vae_name,
+            clip_skip,
+            adm_scaler_positive,
+            adm_scaler_negative,
+            adm_scaler_end,
+            adaptive_cfg,
+            save_local,
+        ]
+
         def _export_preset(include_imgs, name, *vals):
             values = {k: v for k, v in zip(SETTING_KEYS, vals[: len(SETTING_KEYS)])}
             img_vals = vals[len(SETTING_KEYS) :]
@@ -635,8 +1028,6 @@ def build_ui() -> gr.Blocks:
                     gr.update() for _ in image_controls
                 ] + [gr.update(visible=False), f"Load failed: {exc}"]
 
-            settings = parsed.get("settings") or {}
-            images = parsed.get("images") or {}
             flat = settings_to_updates(parsed)
             updates = []
             for key in SETTING_KEYS:
@@ -689,68 +1080,273 @@ def build_ui() -> gr.Blocks:
             ],
         )
 
+        def _hold():
+            """No-op updates while a job is queued/running (preserve thumbs + marks)."""
+            return (
+                gr.update(),  # history
+                gr.update(),  # index
+                gr.update(),  # thumbs
+                gr.update(),  # viewer
+                gr.update(),  # download
+                gr.update(),  # nav
+                gr.update(),  # prev
+                gr.update(),  # next
+                gr.update(),  # picked
+                gr.update(),  # pick_box
+                gr.update(),  # pick_status
+                gr.update(),  # cache
+            )
+
+        def _empty_viewer():
+            bundle = _viewer_bundle([], 0, [])
+            return (
+                *bundle,
+                "Cleared.",
+                "Idle.",
+                gr.update(visible=False),
+                None,
+                "0 / 0",
+            )
+
+        def _run_job(history, index, picked, *args):
+            """Keep every queued Generate; append results to session history."""
+            tip = (args[0] or "").strip().replace("\n", " ") if args else ""
+            if len(tip) > 80:
+                tip = tip[:77] + "..."
+            hist = _alive_paths(history)
+            marks = list(picked or [])
+            yield (
+                *_hold(),
+                gr.update(),  # status
+                f"In queue / running: {tip or '(image tools)'} · kept {len(hist)} image(s)",
+                gr.update(),
+                gr.update(),
+                gr.update(),
+            )
+            try:
+                paths, info = generate(*args)
+            except Exception as exc:  # noqa: BLE001
+                bundle = _viewer_bundle(hist, index, marks)
+                yield (
+                    *bundle,
+                    f"Failed: {exc}",
+                    f"Failed · history still has {len(hist)} image(s).",
+                    gr.update(),
+                    gr.update(),
+                    gr.update(),
+                )
+                return
+
+            new_paths = _alive_paths(list(paths or []))
+            if not new_paths:
+                bundle = _viewer_bundle(hist, index, marks)
+                yield (
+                    *bundle,
+                    "Worker returned no files.",
+                    "Failed · empty result.",
+                    gr.update(),
+                    gr.update(),
+                    gr.update(),
+                )
+                return
+
+            merged = (hist + new_paths)[-MAX_HISTORY:]
+            # Drop marks that fell off the MAX_HISTORY window.
+            alive = set(merged)
+            marks = [p for p in marks if p in alive]
+            new_index = max(0, len(merged) - len(new_paths))
+            bundle = _viewer_bundle(merged, new_index, marks)
+            yield (
+                *bundle,
+                info,
+                f"Done · +{len(new_paths)} · session {len(merged)} image(s). {info}",
+                gr.update(),
+                bundle[3],
+                bundle[5],
+            )
+
+        def _step(history, index, picked, delta: int):
+            hist = _alive_paths(history)
+            if not hist:
+                return _viewer_bundle([], 0, [])
+            idx = (int(index) + delta) % len(hist)
+            return _viewer_bundle(hist, idx, picked)
+
+        def _pick(evt: gr.SelectData, history, index, picked):
+            hist = _alive_paths(history)
+            if not hist:
+                return _viewer_bundle([], 0, [])
+            raw = evt.index
+            if isinstance(raw, (list, tuple)) and raw:
+                raw = raw[0]
+            try:
+                idx = int(raw)
+            except Exception:
+                idx = int(index or 0)
+            return _viewer_bundle(hist, idx, picked)
+
+        def _toggle_mark(history, index, picked):
+            hist = _alive_paths(history)
+            if not hist:
+                return _viewer_bundle([], 0, [])
+            idx = max(0, min(int(index or 0), len(hist) - 1))
+            selected = hist[idx]
+            marks = [p for p in _alive_paths(picked) if p in set(hist)]
+            if selected in marks:
+                marks = [p for p in marks if p != selected]
+            else:
+                marks.append(selected)
+            return _viewer_bundle(hist, idx, marks)
+
+        def _sync_marks(chosen, history, index):
+            hist = _alive_paths(history)
+            marks = [p for p in (chosen or []) if p in set(hist)]
+            return _viewer_bundle(hist, index, marks)
+
+        def _clear_marks(history, index):
+            return _viewer_bundle(_alive_paths(history), index, [])
+
+        def _download_marks(picked):
+            try:
+                return _zip_picked(picked)
+            except Exception as exc:  # noqa: BLE001
+                raise gr.Error(str(exc)) from exc
+
+        def _restore_cache(raw: str):
+            hist, idx, marks = _parse_cache(raw)
+            return _viewer_bundle(hist, idx, marks)
+
+        def _open_fs(history, index):
+            hist = _alive_paths(history)
+            if not hist:
+                return gr.update(visible=False), None, "0 / 0"
+            idx = max(0, min(int(index or 0), len(hist) - 1))
+            return gr.update(visible=True), hist[idx], _nav_label(idx, len(hist))
+
+        def _close_fs():
+            return gr.update(visible=False)
+
+        def _fs_step(history, index, picked, delta: int):
+            hist = _alive_paths(history)
+            if not hist:
+                empty = _viewer_bundle([], 0, [])
+                return (*empty, gr.update(visible=True), None, "0 / 0")
+            idx = (int(index) + delta) % len(hist)
+            bundle = _viewer_bundle(hist, idx, picked)
+            return (*bundle, gr.update(visible=True), hist[idx], bundle[5])
+
+        viewer_outs = [
+            history_state,
+            index_state,
+            thumbs,
+            viewer,
+            download_file,
+            nav_label,
+            prev_btn,
+            next_btn,
+            picked_state,
+            pick_box,
+            pick_status,
+            cache_box,
+        ]
+
         go.click(
-            generate,
-            inputs=[
-                prompt,
-                negative,
-                styles,
-                performance,
-                aspect,
-                image_number,
-                seed,
-                sharpness,
-                guidance,
-                base_model,
-                refiner_model,
-                refiner_switch,
-                *lora_ctrls,
-                input_image_on,
-                uov_method,
-                uov_image,
-                ip1_image,
-                ip1_type,
-                ip1_stop,
-                ip1_weight,
-                ip2_image,
-                ip2_type,
-                ip2_stop,
-                ip2_weight,
-                ip3_image,
-                ip3_type,
-                ip3_stop,
-                ip3_weight,
-                ip4_image,
-                ip4_type,
-                ip4_stop,
-                ip4_weight,
-                mix_ip_uov,
-                mix_ip_inpaint,
-                inpaint_image,
-                inpaint_mask,
-                inpaint_prompt,
-                inpaint_strength,
-                inpaint_field,
-                inpaint_engine,
-                outpaint,
-                enhance_on,
-                enhance_image,
-                enhance_uov,
-                output_format,
-                read_wildcards,
-                black_out_nsfw,
-                sampler_name,
-                scheduler_name,
-                vae_name,
-                clip_skip,
-                adm_scaler_positive,
-                adm_scaler_negative,
-                adm_scaler_end,
-                adaptive_cfg,
-                save_local,
+            _run_job,
+            inputs=[history_state, index_state, picked_state, *generate_inputs],
+            outputs=[
+                *viewer_outs,
+                status,
+                queue_status,
+                fs_panel,
+                fs_image,
+                fs_nav,
             ],
-            outputs=[gallery, status],
+            concurrency_limit=1,
+            concurrency_id="generate-queue",
+            trigger_mode="multiple",
+            queue=True,
+            show_progress="full",
         )
+
+        clear_result.click(
+            _empty_viewer,
+            outputs=[*viewer_outs, status, queue_status, fs_panel, fs_image, fs_nav],
+            queue=False,
+        )
+        prev_btn.click(
+            lambda h, i, p: _step(h, i, p, -1),
+            inputs=[history_state, index_state, picked_state],
+            outputs=viewer_outs,
+            queue=False,
+        )
+        next_btn.click(
+            lambda h, i, p: _step(h, i, p, 1),
+            inputs=[history_state, index_state, picked_state],
+            outputs=viewer_outs,
+            queue=False,
+        )
+        thumbs.select(
+            _pick,
+            inputs=[history_state, index_state, picked_state],
+            outputs=viewer_outs,
+            queue=False,
+        )
+        mark_btn.click(
+            _toggle_mark,
+            inputs=[history_state, index_state, picked_state],
+            outputs=viewer_outs,
+            queue=False,
+        )
+        pick_box.change(
+            _sync_marks,
+            inputs=[pick_box, history_state, index_state],
+            outputs=viewer_outs,
+            queue=False,
+        )
+        clear_marks_btn.click(
+            _clear_marks,
+            inputs=[history_state, index_state],
+            outputs=viewer_outs,
+            queue=False,
+        )
+        download_zip_btn.click(
+            _download_marks,
+            inputs=[picked_state],
+            outputs=[zip_file],
+            queue=False,
+        )
+        cache_restore.click(
+            _restore_cache,
+            inputs=[cache_box],
+            outputs=viewer_outs,
+            queue=False,
+        )
+        demo.load(
+            _restore_cache,
+            inputs=[cache_box],
+            outputs=viewer_outs,
+            queue=False,
+        )
+        fs_open.click(
+            _open_fs,
+            inputs=[history_state, index_state],
+            outputs=[fs_panel, fs_image, fs_nav],
+            queue=False,
+        )
+        fs_close.click(_close_fs, outputs=[fs_panel], queue=False)
+        fs_prev.click(
+            lambda h, i, p: _fs_step(h, i, p, -1),
+            inputs=[history_state, index_state, picked_state],
+            outputs=[*viewer_outs, fs_panel, fs_image, fs_nav],
+            queue=False,
+        )
+        fs_next.click(
+            lambda h, i, p: _fs_step(h, i, p, 1),
+            inputs=[history_state, index_state, picked_state],
+            outputs=[*viewer_outs, fs_panel, fs_image, fs_nav],
+            queue=False,
+        )
+
     return demo
 
 
@@ -779,7 +1375,8 @@ def _patch_gradio_quirks() -> None:
 def main() -> None:
     _patch_gradio_quirks()
     demo = build_ui()
-    demo.queue(api_open=False).launch(
+    # max_size keeps many queued Generate clicks; concurrency on the event is 1.
+    demo.queue(api_open=False, default_concurrency_limit=8, max_size=32).launch(
         server_name=HOST,
         server_port=PORT,
         share=False,

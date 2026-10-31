@@ -4,6 +4,30 @@ Newest entries first. Format enforced by skill `audit-trail`.
 
 ## [Unreleased]
 
+### 2026-10-31 - Mark/download ZIP, local cache, preset JSON verified
+
+- **What:** Click Selected opens fullscreen; mark images for multi-download ZIP; session history/marks persist via browser localStorage; expanded preset unit tests (ordered zip, file roundtrip, optional images) to keep JSON save/load aligned with UI controls.
+- **Why:** Usability for browsing/saving favorites across reload, without breaking preset JSON after the results-panel rewrite.
+- **Paths:** `local/ui.py`, `tests/test_presets.py`
+
+### 2026-10-31 - Session history, image nav, resilient queue UI
+
+- **What:** Results now append across queued jobs (capped history); Prev/Next + thumbnail select; fullscreen overlay closes on outside click/Esc; generate errors no longer wipe prior images; compact responsive viewer.
+- **Why:** Second queued batch replaced the first in the UI, and fullscreen/nav usability was incomplete.
+- **Paths:** `local/ui.py`
+
+### 2026-10-31 - Fix Generate queue and compact result viewer
+
+- **What:** Queue uses `trigger_mode=multiple` + `concurrency_limit=1`; compact result viewer instead of a giant session gallery.
+- **Why:** Extra Generate clicks were cancelled; oversized gallery broke the page.
+- **Paths:** `local/ui.py`
+
+### 2026-10-30 - Sticky Generate, job queue, richer gallery
+
+- **What:** Moved prompt + Generate into a sticky top action bar; first pass at sequential queue and result viewing.
+- **Why:** Generate was buried under settings while results sat at the top.
+- **Paths:** `local/ui.py`
+
 ### 2026-10-30 - Shorter GPU scaledown default
 
 - **What:** Default `SCALEDOWN_WINDOW` set to 15s; documented stop/redeploy if a container stays live after idle.
