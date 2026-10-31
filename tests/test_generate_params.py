@@ -68,6 +68,9 @@ class GenerateParamsTests(unittest.TestCase):
             inpaint_mask_b64="DDD",
             outpaint_selections=["Left", "Right"],
             inpaint_strength=0.8,
+            inpaint_method="Improve Detail (face, hand, eyes, etc.)",
+            invert_mask=True,
+            inpaint_advanced_masking=True,
             enhance_checkbox=True,
             enhance_image_b64="EEE",
             enhance_uov_method="Upscale (Fast 2x)",
@@ -76,6 +79,11 @@ class GenerateParamsTests(unittest.TestCase):
         self.assertEqual(restored.uov_method, "Vary (Subtle)")
         self.assertEqual(restored.outpaint_selections, ["Left", "Right"])
         self.assertEqual(restored.inpaint_strength, 0.8)
+        self.assertEqual(
+            restored.inpaint_method, "Improve Detail (face, hand, eyes, etc.)"
+        )
+        self.assertTrue(restored.invert_mask)
+        self.assertTrue(restored.inpaint_advanced_masking)
         self.assertTrue(restored.enhance_checkbox)
         self.assertEqual(restored.enhance_uov_method, "Upscale (Fast 2x)")
 

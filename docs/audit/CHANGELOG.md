@@ -4,6 +4,25 @@ Newest entries first. Format enforced by skill `audit-trail`.
 
 ## [Unreleased]
 
+### 2026-10-31 - Fooocus inpaint/outpaint polish and public docs
+
+- **What:** Inpaint Method (default / Improve Detail / Modify Content), white brush mask tools (fill/clear/invert), advanced mask upload + invert + erode/dilate wired to the worker; dark sticky toolbars so controls stay readable over images; consolidated end-user guide and contributor docs.
+- **Why:** Mask creation and Method modes should match Fooocus; buttons were hard to see over bright results; public docs needed one clear entry path before release push.
+- **Paths:** `local/ui.py`, `local/presets.py`, `src/generate_params.py`, `src/fooocus_task.py`, `docs/USER_GUIDE.md`, `README.md`, `CONTRIBUTING.md`, `docs/architecture/OVERVIEW.md`, `local/README.md`, `tests/`
+- **Plans:** `.cursor/planx/20261031-0055-inpaint-docs-release.md`
+
+### 2026-10-31 - Persist full page settings + settings-only preset JSON
+
+- **What:** Session cache now stores prompt and all SETTING_KEYS (no images); autosave on control change; restore settings+gallery on reload; preset download always settings-only; mirror `outputs/presets/last-session.json`.
+- **Why:** Reload kept thumbs but wiped prompt/configs; JSON should capture the page without embedding input images.
+- **Paths:** `local/ui.py`, `tests/test_session_cache.py`, `local/README.md`
+
+### 2026-10-31 - Fix session restore after page reload
+
+- **What:** Persist gallery index/marks to `outputs/.session_cache.json` on every viewer update; restore on Gradio `demo.load`. Dropped the localStorage bridge (Gradio updates never fired the JS save).
+- **Why:** Reloading the page cleared history/marks even when image files were still on disk.
+- **Paths:** `local/ui.py`, `local/README.md`
+
 ### 2026-10-31 - Mark/download ZIP, local cache, preset JSON verified
 
 - **What:** Click Selected opens fullscreen; mark images for multi-download ZIP; session history/marks persist via browser localStorage; expanded preset unit tests (ordered zip, file roundtrip, optional images) to keep JSON save/load aligned with UI controls.

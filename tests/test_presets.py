@@ -62,10 +62,14 @@ def _sample_values(**overrides):
         "ip4_weight": 0.6,
         "mix_ip_uov": False,
         "mix_ip_inpaint": False,
+        "inpaint_method": "Inpaint or Outpaint (default)",
         "inpaint_prompt": "",
         "inpaint_strength": 1.0,
         "inpaint_field": 0.618,
         "inpaint_engine": "v2.6",
+        "inpaint_advanced_masking": False,
+        "invert_mask": False,
+        "inpaint_erode_or_dilate": 0,
         "outpaint": [],
         "enhance_on": False,
         "enhance_uov": "Disabled",
@@ -92,7 +96,7 @@ class PresetTests(unittest.TestCase):
         values = _sample_values()
         missing = [k for k in SETTING_KEYS if k not in values]
         self.assertEqual(missing, [])
-        self.assertEqual(len(SETTING_KEYS), 58)
+        self.assertEqual(len(SETTING_KEYS), 62)
         self.assertEqual(len(IMAGE_KEYS), 6)
 
     def test_roundtrip_settings(self) -> None:

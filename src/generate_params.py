@@ -59,6 +59,12 @@ class GenerateParams:
     inpaint_strength: float = 1.0
     inpaint_respective_field: float = 0.618
     inpaint_engine: str = "v2.6"
+    # Fooocus parity: method drives disable_initial_latent / engine defaults in the UI.
+    inpaint_method: str = "Inpaint or Outpaint (default)"
+    inpaint_disable_initial_latent: bool = False
+    inpaint_advanced_masking: bool = False
+    invert_mask: bool = False
+    inpaint_erode_or_dilate: int = 0
 
     # Image Prompt slots (FaceSwap, ImagePrompt, PyraCanny, CPDS)
     image_prompts: list[ImagePromptSlot] = field(default_factory=list)

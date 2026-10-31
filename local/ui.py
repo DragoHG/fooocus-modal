@@ -13,7 +13,7 @@ from pathlib import Path
 
 import gradio as gr
 from dotenv import load_dotenv
-from PIL import Image
+from PIL import Image, ImageChops, ImageOps
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -28,6 +28,8 @@ HOST = os.environ.get("LOCAL_UI_HOST", "127.0.0.1")
 PORT = int(os.environ.get("LOCAL_UI_PORT", "7860"))
 OUTPUT_DIR = Path(os.environ.get("LOCAL_OUTPUT_DIR", ROOT / "outputs"))
 PRESET_DIR = OUTPUT_DIR / "presets"
+# Survives page reload (Gradio State does not). Paths must still exist on disk.
+SESSION_CACHE_PATH = OUTPUT_DIR / ".session_cache.json"
 
 DEFAULT_CHECKPOINT = "juggernautXL_v8Rundiffusion.safetensors"
 DEFAULT_LORA = "sd_xl_offset_example-lora_1.0.safetensors"
@@ -105,7 +107,19 @@ SAMPLER_CHOICES = [
 ]
 SCHEDULER_CHOICES = ["Default", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform", "normal"]
 VAE_CHOICES = ["Default (model)"]
-INPAINT_ENGINES = ["v2.6", "v1"]
+INPAINT_ENGINES = ["None", "v1", "v2.5", "v2.6"]
+INPAINT_METHODS = [
+    "Inpaint or Outpaint (default)",
+    "Improve Detail (face, hand, eyes, etc.)",
+    "Modify Content (add objects, change background, etc.)",
+]
+INPAINT_QUICK_PROMPTS = [
+    "highly detailed face",
+    "detailed hand",
+    "detailed eyes",
+    "beautiful eyes",
+    "detailed fingers",
+]
 
 MAX_HISTORY = 48
 
@@ -134,16 +148,47 @@ UI_CSS = """
 #result-viewer {
   cursor: zoom-in;
 }
+#result-controls {
+  position: relative;
+  z-index: 5;
+  background: var(--body-background-fill, #0b1220);
+  padding: 8px 0 4px;
+  border-top: 1px solid var(--border-color-primary, #333);
+}
+#result-controls button {
+  background: #1a2332 !important;
+  color: #f3f6fb !important;
+  border: 1px solid #4b5568 !important;
+}
+#result-controls button:hover {
+  background: #243044 !important;
+}
+#inpaint-editor {
+  min-height: 420px;
+}
+#inpaint-editor button,
+#inpaint-editor .toolbar button,
+#inpaint-editor [class*="icon"] {
+  background: #111827 !important;
+  color: #f9fafb !important;
+  border: 1px solid #6b7280 !important;
+  opacity: 1 !important;
+}
+#inpaint-mask-tools button {
+  background: #1f2937 !important;
+  color: #f9fafb !important;
+  border: 1px solid #6b7280 !important;
+}
 /* Only style when Gradio shows the panel. Never force display with !important. */
 #fm-fullscreen:not(.hide):not([hidden]) {
   position: fixed !important;
   inset: 0 !important;
   z-index: 100000 !important;
-  background: rgba(0, 0, 0, 0.88) !important;
+  background: rgba(0, 0, 0, 0.92) !important;
   flex-direction: column !important;
   align-items: center !important;
-  justify-content: center !important;
-  padding: 24px !important;
+  justify-content: flex-start !important;
+  padding: 16px !important;
   box-sizing: border-box !important;
   cursor: zoom-out;
   overflow: auto !important;
@@ -152,6 +197,32 @@ UI_CSS = """
   cursor: default;
   max-width: min(96vw, 1400px);
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#fm-fullscreen .fm-fs-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(10, 14, 22, 0.96);
+  border: 1px solid #4b5568;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+#fm-fullscreen .fm-fs-toolbar button {
+  background: #1f2937 !important;
+  color: #f9fafb !important;
+  border: 1px solid #9ca3af !important;
+}
+#fm-fullscreen .fm-fs-toolbar button:hover {
+  background: #374151 !important;
+}
+#fm-fullscreen img,
+#fm-fullscreen .image-container,
+#fm-fullscreen .image-frame {
+  max-height: 72vh !important;
+  object-fit: contain !important;
 }
 @media (max-width: 960px) {
   #main-row { flex-direction: column !important; }
@@ -160,100 +231,56 @@ UI_CSS = """
 }
 """
 
-CACHE_KEY = "fooocus-modal-cache-v1"
-
-UI_JS = f"""
-() => {{
-  const KEY = "{CACHE_KEY}";
-
-  const cacheEl = () => document.querySelector("#fm-cache-box textarea, #fm-cache-box input");
-
-  const saveCacheFromBox = () => {{
-    const el = cacheEl();
-    if (el && typeof el.value === "string" && el.value.length > 2) {{
-      try {{ localStorage.setItem(KEY, el.value); }} catch (err) {{}}
-    }}
-  }};
-
-  const injectCacheToBox = () => {{
-    const el = cacheEl();
-    if (!el) return false;
-    let raw = null;
-    try {{ raw = localStorage.getItem(KEY); }} catch (err) {{ return false; }}
-    if (!raw) return false;
-    const setter = Object.getOwnPropertyDescriptor(
-      window.HTMLTextAreaElement.prototype, "value"
-    )?.set || Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype, "value"
-    )?.set;
-    if (setter) setter.call(el, raw);
-    else el.value = raw;
-    el.dispatchEvent(new Event("input", {{ bubbles: true }}));
-    el.dispatchEvent(new Event("change", {{ bubbles: true }}));
-    const btn = document.querySelector("#fm-cache-restore button");
-    if (btn) btn.click();
-    return true;
-  }};
-
-  const bindFsClose = () => {{
+UI_JS = """
+() => {
+  const bindFsClose = () => {
     const root = document.getElementById("fm-fullscreen");
     if (!root || root.dataset.fmBound === "1") return;
     root.dataset.fmBound = "1";
-    root.addEventListener("click", (e) => {{
-      if (e.target === root) {{
+    root.addEventListener("click", (e) => {
+      if (e.target === root) {
         document.querySelector("#fm-fs-close button")?.click();
-      }}
-    }});
-  }};
+      }
+    });
+  };
 
-  const bindViewerZoom = () => {{
+  const bindViewerZoom = () => {
     const root = document.querySelector("#result-viewer");
     if (!root || root.dataset.clickBound === "1") return;
     root.dataset.clickBound = "1";
-    root.addEventListener("click", (e) => {{
+    root.addEventListener("click", (e) => {
       if (e.target.closest("a, button, .download, label")) return;
       document.querySelector("#fm-fs-open button")?.click();
-    }});
-  }};
+    });
+  };
 
-  const bindCacheWatch = () => {{
-    const el = cacheEl();
-    if (!el || el.dataset.cacheBound === "1") return;
-    el.dataset.cacheBound = "1";
-    el.addEventListener("input", saveCacheFromBox);
-    el.addEventListener("change", saveCacheFromBox);
-  }};
-
-  const boot = () => {{
+  const boot = () => {
     bindFsClose();
     bindViewerZoom();
-    bindCacheWatch();
-    injectCacheToBox();
-  }};
+  };
 
-  const obs = new MutationObserver(() => {{
-    bindFsClose();
-    bindViewerZoom();
-    bindCacheWatch();
-  }});
-  obs.observe(document.body, {{ childList: true, subtree: true }});
-  document.addEventListener("keydown", (e) => {{
+  const obs = new MutationObserver(boot);
+  obs.observe(document.body, { childList: true, subtree: true });
+  document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     const root = document.getElementById("fm-fullscreen");
     if (!root || root.classList.contains("hide") || root.style.display === "none") return;
     document.querySelector("#fm-fs-close button")?.click();
-  }});
+  });
   setTimeout(boot, 400);
   setTimeout(boot, 1200);
-}}
+}
 """
 
 
 def _alive_paths(paths: list | None) -> list[str]:
     out: list[str] = []
     for p in paths or []:
-        if p and Path(str(p)).is_file():
-            out.append(str(p))
+        if not p:
+            continue
+        path = Path(str(p))
+        if path.is_file():
+            out.append(str(path.resolve()))
     return out
 
 
@@ -270,25 +297,53 @@ def _pick_choices(history: list[str]) -> list[tuple[str, str]]:
     return choices
 
 
-def _cache_payload(history: list[str], index: int, picked: list[str]) -> str:
-    return json.dumps(
-        {
-            "version": 1,
-            "history": _alive_paths(history),
-            "index": int(index or 0),
-            "picked": _alive_paths(picked),
-        },
-        ensure_ascii=True,
-    )
+def _jsonable_setting(value):
+    """Coerce control values into JSON-safe forms (never images)."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, (list, tuple)):
+        return [_jsonable_setting(v) for v in value]
+    if isinstance(value, dict):
+        # ImageEditor / rare nested blobs — skip
+        return None
+    try:
+        if isinstance(value, Image.Image):
+            return None
+    except Exception:
+        pass
+    return str(value)
 
 
-def _parse_cache(raw: str | None) -> tuple[list[str], int, list[str]]:
+def _settings_from_values(values: dict | None) -> dict:
+    out: dict = {}
+    for key in SETTING_KEYS:
+        if values and key in values:
+            coerced = _jsonable_setting(values[key])
+            if coerced is not None or values[key] is None:
+                out[key] = coerced
+    return out
+
+
+def _read_session_raw() -> dict:
+    try:
+        if SESSION_CACHE_PATH.is_file():
+            data = json.loads(SESSION_CACHE_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+    except (OSError, json.JSONDecodeError):
+        pass
+    return {}
+
+
+def _parse_cache(raw: str | None) -> tuple[list[str], int, list[str], dict]:
     if not raw or not str(raw).strip():
-        return [], 0, []
+        return [], 0, [], {}
     try:
         data = json.loads(raw)
     except Exception:
-        return [], 0, []
+        return [], 0, [], {}
+    if not isinstance(data, dict):
+        return [], 0, [], {}
     history = _alive_paths(data.get("history") or [])
     picked = [p for p in _alive_paths(data.get("picked") or []) if p in set(history)]
     index = int(data.get("index") or 0)
@@ -296,13 +351,83 @@ def _parse_cache(raw: str | None) -> tuple[list[str], int, list[str]]:
         index = max(0, min(index, len(history) - 1))
     else:
         index = 0
-    return history, index, picked
+    settings = _settings_from_values(data.get("settings") or {})
+    return history, index, picked, settings
+
+
+def _persist_session(
+    history: list[str],
+    index: int,
+    picked: list[str],
+    settings: dict | None = None,
+) -> str:
+    """Write gallery + marks + settings (no images) for page reload."""
+    prev = _read_session_raw()
+    history = _alive_paths(history)
+    picked = [p for p in _alive_paths(picked) if p in set(history)]
+    index = int(index or 0)
+    if history:
+        index = max(0, min(index, len(history) - 1))
+    else:
+        index = 0
+    if settings is None:
+        merged_settings = _settings_from_values(prev.get("settings") or {})
+    else:
+        merged_settings = _settings_from_values(settings)
+    payload_obj = {
+        "version": 2,
+        "history": history,
+        "index": index,
+        "picked": picked,
+        "settings": merged_settings,
+    }
+    payload = json.dumps(payload_obj, ensure_ascii=True, indent=2)
+    try:
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        SESSION_CACHE_PATH.write_text(payload, encoding="utf-8")
+        # Mirror settings-only JSON (no images) for easy backup / preset reuse.
+        if merged_settings:
+            PRESET_DIR.mkdir(parents=True, exist_ok=True)
+            last = PRESET_DIR / "last-session.json"
+            last.write_text(
+                preset_to_json(merged_settings, include_images=False, name="last-session"),
+                encoding="utf-8",
+            )
+    except OSError:
+        pass
+    return payload
+
+
+def _load_session_cache() -> tuple[list[str], int, list[str], dict]:
+    data = _read_session_raw()
+    if not data:
+        return [], 0, [], {}
+    history = _alive_paths(data.get("history") or [])
+    picked = [p for p in _alive_paths(data.get("picked") or []) if p in set(history)]
+    index = int(data.get("index") or 0)
+    if history:
+        index = max(0, min(index, len(history) - 1))
+    else:
+        index = 0
+    settings = _settings_from_values(data.get("settings") or {})
+    return history, index, picked, settings
+
+
+def _setting_updates(settings: dict) -> list:
+    updates = []
+    for key in SETTING_KEYS:
+        if key in settings:
+            updates.append(gr.update(value=settings[key]))
+        else:
+            updates.append(gr.update())
+    return updates
 
 
 def _viewer_bundle(history: list[str], index: int, picked: list[str] | None = None):
     history = _alive_paths(history)
     picked = [p for p in _alive_paths(picked) if p in set(history)]
     if not history:
+        _persist_session([], 0, [])
         return (
             [],
             0,
@@ -315,12 +440,12 @@ def _viewer_bundle(history: list[str], index: int, picked: list[str] | None = No
             [],
             gr.update(choices=[], value=[]),
             "Marked: 0",
-            _cache_payload([], 0, []),
         )
     index = max(0, min(int(index), len(history) - 1))
     selected = history[index]
     cols = 1 if len(history) == 1 else (2 if len(history) <= 6 else 3)
     marked = selected in set(picked)
+    _persist_session(history, index, picked)
     return (
         history,
         index,
@@ -333,7 +458,6 @@ def _viewer_bundle(history: list[str], index: int, picked: list[str] | None = No
         picked,
         gr.update(choices=_pick_choices(history), value=picked),
         f"Marked: {len(picked)}" + (" · current marked" if marked else ""),
-        _cache_payload(history, index, picked),
     )
 
 
@@ -353,10 +477,132 @@ def _pil_to_b64(img: Image.Image | None) -> str | None:
     if img is None:
         return None
     if not isinstance(img, Image.Image):
-        img = Image.fromarray(img)
+        try:
+            img = Image.fromarray(img)
+        except Exception:
+            return None
     buf = BytesIO()
     img.convert("RGB").save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def _as_pil(img) -> Image.Image | None:
+    if img is None:
+        return None
+    if isinstance(img, Image.Image):
+        return img
+    try:
+        return Image.fromarray(img)
+    except Exception:
+        return None
+
+
+def _mask_from_layer(layer: Image.Image | None) -> Image.Image | None:
+    """Build an RGB mask (white = edit) from a brush layer."""
+    layer = _as_pil(layer)
+    if layer is None:
+        return None
+    if layer.mode == "RGBA":
+        alpha = layer.split()[-1]
+        rgb = layer.convert("RGB")
+        # Prefer alpha strokes; fall back to bright paint on transparent canvas.
+        a = alpha.point(lambda p: 255 if p > 16 else 0)
+        # Brightness of RGB also counts (white brush on transparent).
+        gray = rgb.convert("L")
+        bright = gray.point(lambda p: 255 if p > 32 else 0)
+        combined = ImageChops.lighter(a, bright)
+        return Image.merge("RGB", (combined, combined, combined))
+    gray = layer.convert("L")
+    bw = gray.point(lambda p: 255 if p > 32 else 0)
+    return Image.merge("RGB", (bw, bw, bw))
+
+
+def _editor_to_image_and_mask(editor_value, extra_mask=None) -> tuple[Image.Image | None, Image.Image | None]:
+    """Parse Gradio ImageEditor / upload into background + mask (Fooocus-style)."""
+    bg = None
+    mask = None
+    if isinstance(editor_value, dict):
+        bg = _as_pil(editor_value.get("background") or editor_value.get("image"))
+        layers = editor_value.get("layers") or []
+        if layers:
+            mask = _mask_from_layer(_as_pil(layers[0]))
+        if mask is None:
+            composite = _as_pil(editor_value.get("composite"))
+            if bg is not None and composite is not None and composite.size == bg.size:
+                diff = ImageChops.difference(composite.convert("RGB"), bg.convert("RGB"))
+                gray = diff.convert("L").point(lambda p: 255 if p > 12 else 0)
+                if gray.getextrema()[1] > 0:
+                    mask = Image.merge("RGB", (gray, gray, gray))
+    else:
+        bg = _as_pil(editor_value)
+
+    extra = _as_pil(extra_mask)
+    if extra is not None:
+        extra_rgb = _mask_from_layer(extra) or extra.convert("RGB")
+        if mask is None:
+            mask = extra_rgb
+        elif bg is not None:
+            if extra_rgb.size != mask.size:
+                extra_rgb = extra_rgb.resize(mask.size, Image.Resampling.NEAREST)
+            mask = ImageChops.lighter(mask, extra_rgb)
+    return bg, mask
+
+
+def _editor_value(bg: Image.Image | None, mask: Image.Image | None = None) -> dict | None:
+    if bg is None:
+        return None
+    bg = bg.convert("RGBA")
+    layers: list[Image.Image] = []
+    if mask is not None:
+        m = mask.convert("L")
+        if m.size != bg.size:
+            m = m.resize(bg.size, Image.Resampling.NEAREST)
+        layer = Image.new("RGBA", bg.size, (0, 0, 0, 0))
+        white = Image.new("RGBA", bg.size, (255, 255, 255, 255))
+        layer.paste(white, (0, 0), m.point(lambda p: 255 if p > 32 else 0))
+        layers = [layer]
+    return {"background": bg.convert("RGB"), "layers": layers, "composite": None}
+
+
+def _inpaint_mode_defaults(method: str, engine: str):
+    """Match Fooocus webui `inpaint_mode_change` defaults."""
+    detail = INPAINT_METHODS[1]
+    modify = INPAINT_METHODS[2]
+    if method == detail:
+        return {
+            "prompt_visible": True,
+            "outpaint_visible": False,
+            "outpaint_value": [],
+            "disable_initial_latent": False,
+            "engine": "None",
+            "strength": 0.5,
+            "field": 0.0,
+        }
+    if method == modify:
+        eng = engine if engine and engine != "empty" else "v2.6"
+        if eng == "None":
+            eng = "v2.6"
+        return {
+            "prompt_visible": True,
+            "outpaint_visible": False,
+            "outpaint_value": [],
+            "disable_initial_latent": True,
+            "engine": eng,
+            "strength": 1.0,
+            "field": 0.0,
+        }
+    eng = engine if engine and engine != "empty" else "v2.6"
+    if eng == "None":
+        eng = "v2.6"
+    return {
+        "prompt_visible": False,
+        "outpaint_visible": True,
+        "outpaint_value": gr.update(),
+        "disable_initial_latent": False,
+        "engine": eng,
+        "strength": 1.0,
+        "field": 0.618,
+    }
 
 
 def _modal_ready() -> bool:
@@ -440,10 +686,14 @@ def generate(
     mix_ip_inpaint,
     inpaint_image,
     inpaint_mask,
+    inpaint_method,
     inpaint_prompt,
     inpaint_strength,
     inpaint_field,
     inpaint_engine,
+    inpaint_advanced_masking,
+    invert_mask,
+    inpaint_erode_or_dilate,
     outpaint,
     enhance_on,
     enhance_image,
@@ -504,15 +754,15 @@ def generate(
     elif enhance_on:
         current_tab = "enhance"
 
-    inpaint_img = inpaint_image
-    inpaint_msk = None
-    if isinstance(inpaint_image, dict):
-        inpaint_img = inpaint_image.get("background") or inpaint_image.get("image")
-        inpaint_msk = inpaint_image.get("layers")
-        if isinstance(inpaint_msk, list) and inpaint_msk:
-            inpaint_msk = inpaint_msk[0]
-    if inpaint_mask is not None and inpaint_msk is None:
-        inpaint_msk = inpaint_mask
+    inpaint_img, inpaint_msk = _editor_to_image_and_mask(
+        inpaint_image, inpaint_mask if inpaint_advanced_masking else None
+    )
+    mode = _inpaint_mode_defaults(inpaint_method or INPAINT_METHODS[0], inpaint_engine or "v2.6")
+    # Apply Fooocus method defaults when the user left sliders at prior values is already
+    # handled by the Method dropdown; still honor explicit disable_initial_latent from mode.
+    engine = inpaint_engine or mode["engine"]
+    if engine == "None" and (inpaint_method or "") == INPAINT_METHODS[0]:
+        engine = "v2.6"
 
     sampler = None if not sampler_name or sampler_name == "Default" else sampler_name
     scheduler = None if not scheduler_name or scheduler_name == "Default" else scheduler_name
@@ -553,7 +803,12 @@ def generate(
         "inpaint_additional_prompt": inpaint_prompt or "",
         "inpaint_strength": float(inpaint_strength),
         "inpaint_respective_field": float(inpaint_field),
-        "inpaint_engine": inpaint_engine or "v2.6",
+        "inpaint_engine": engine,
+        "inpaint_method": inpaint_method or INPAINT_METHODS[0],
+        "inpaint_disable_initial_latent": bool(mode["disable_initial_latent"]),
+        "inpaint_advanced_masking": bool(inpaint_advanced_masking),
+        "invert_mask": bool(invert_mask),
+        "inpaint_erode_or_dilate": int(inpaint_erode_or_dilate or 0),
         "image_prompts": image_prompts,
         "mixing_image_prompt_and_vary_upscale": bool(mix_ip_uov),
         "mixing_image_prompt_and_inpaint": bool(mix_ip_inpaint),
@@ -616,8 +871,8 @@ def build_ui() -> gr.Blocks:
 
         with gr.Group(elem_id="action-bar"):
             gr.Markdown(
-                "**fooocus-modal** · Queued Generate keeps history. Click Selected to fullscreen "
-                "(click outside / Esc to close). Mark favorites for ZIP download; cache survives reload."
+                "**fooocus-modal** · Prompt, settings, marks and gallery restore after reload "
+                "(images stay out of JSON). Click Selected for fullscreen; Esc / outside closes it."
             )
             with gr.Row():
                 prompt = gr.Textbox(
@@ -731,13 +986,68 @@ def build_ui() -> gr.Blocks:
                                 label="Mix with Inpaint", value=False
                             )
                     with gr.Tab("Inpaint or Outpaint"):
+                        gr.Markdown(
+                            "Upload an image, then **paint the area to change** with the white brush "
+                            "(same idea as Fooocus). Use Method for Detail / Modify Content. "
+                            "Outpaint expands the canvas with Left/Right/Top/Bottom."
+                        )
+                        inpaint_method = gr.Dropdown(
+                            INPAINT_METHODS,
+                            value=INPAINT_METHODS[0],
+                            label="Method",
+                        )
                         inpaint_image = gr.ImageEditor(
-                            label="Image and mask", type="pil", height=360
+                            label="Image and brush mask (paint white over the area to edit)",
+                            elem_id="inpaint-editor",
+                            type="pil",
+                            height=480,
+                            layers=True,
+                            eraser=gr.Eraser(default_size=28),
+                            brush=gr.Brush(
+                                default_size=36,
+                                colors=["#ffffff", "#ff0000"],
+                                default_color="#ffffff",
+                                color_mode="fixed",
+                            ),
+                            transforms=(),
+                            sources=["upload", "clipboard"],
                         )
-                        inpaint_mask = gr.Image(
-                            label="Extra mask (optional)", type="pil", height=200
+                        with gr.Row(elem_id="inpaint-mask-tools"):
+                            mask_fill_btn = gr.Button("Mask entire image", size="sm")
+                            mask_clear_btn = gr.Button("Clear brush mask", size="sm")
+                            mask_invert_btn = gr.Button("Invert brush mask", size="sm")
+                        inpaint_advanced_masking = gr.Checkbox(
+                            label="Enable advanced masking (upload a separate mask)",
+                            value=False,
                         )
-                        inpaint_prompt = gr.Textbox(label="Inpaint additional prompt")
+                        with gr.Column(visible=False) as inpaint_mask_col:
+                            inpaint_mask = gr.Image(
+                                label="Uploaded mask (white = edit)",
+                                type="pil",
+                                height=220,
+                            )
+                            invert_mask = gr.Checkbox(
+                                label="Invert mask when generating",
+                                value=False,
+                            )
+                            inpaint_erode_or_dilate = gr.Slider(
+                                -64,
+                                64,
+                                value=0,
+                                step=1,
+                                label="Erode (−) / dilate (+) mask",
+                            )
+                        inpaint_prompt = gr.Textbox(
+                            label="Inpaint additional prompt",
+                            visible=False,
+                            placeholder="Describe what should appear in the masked area",
+                        )
+                        inpaint_quick = gr.Dropdown(
+                            INPAINT_QUICK_PROMPTS,
+                            label="Quick additional prompt",
+                            value=None,
+                            allow_custom_value=False,
+                        )
                         with gr.Row():
                             inpaint_strength = gr.Slider(
                                 0, 1, value=1.0, step=0.001, label="Inpaint strength"
@@ -766,16 +1076,80 @@ def build_ui() -> gr.Blocks:
                     outputs=image_panel,
                 )
 
+                def _on_inpaint_method(method, engine):
+                    mode = _inpaint_mode_defaults(method, engine or "v2.6")
+                    outpaint_upd = (
+                        gr.update(visible=False, value=[])
+                        if not mode["outpaint_visible"]
+                        else gr.update(visible=True)
+                    )
+                    return (
+                        gr.update(visible=mode["prompt_visible"]),
+                        outpaint_upd,
+                        gr.update(value=mode["engine"]),
+                        gr.update(value=mode["strength"]),
+                        gr.update(value=mode["field"]),
+                    )
+
+                inpaint_method.change(
+                    _on_inpaint_method,
+                    inputs=[inpaint_method, inpaint_engine],
+                    outputs=[
+                        inpaint_prompt,
+                        outpaint,
+                        inpaint_engine,
+                        inpaint_strength,
+                        inpaint_field,
+                    ],
+                    queue=False,
+                )
+                inpaint_advanced_masking.change(
+                    lambda on: gr.update(visible=on),
+                    inputs=inpaint_advanced_masking,
+                    outputs=inpaint_mask_col,
+                    queue=False,
+                )
+                inpaint_quick.change(
+                    lambda q: q or gr.update(),
+                    inputs=inpaint_quick,
+                    outputs=inpaint_prompt,
+                    queue=False,
+                )
+
+                def _mask_fill(editor):
+                    bg, _mask = _editor_to_image_and_mask(editor, None)
+                    if bg is None:
+                        raise gr.Error("Upload an image before creating a mask.")
+                    full = Image.new("L", bg.size, 255)
+                    return _editor_value(bg, full)
+
+                def _mask_clear(editor):
+                    bg, _mask = _editor_to_image_and_mask(editor, None)
+                    if bg is None:
+                        return gr.update()
+                    return _editor_value(bg, None)
+
+                def _mask_invert(editor):
+                    bg, mask = _editor_to_image_and_mask(editor, None)
+                    if bg is None:
+                        raise gr.Error("Upload an image before inverting the mask.")
+                    if mask is None:
+                        full = Image.new("L", bg.size, 255)
+                        return _editor_value(bg, full)
+                    inv = ImageOps.invert(mask.convert("L"))
+                    return _editor_value(bg, inv)
+
+                mask_fill_btn.click(_mask_fill, inputs=inpaint_image, outputs=inpaint_image, queue=False)
+                mask_clear_btn.click(_mask_clear, inputs=inpaint_image, outputs=inpaint_image, queue=False)
+                mask_invert_btn.click(_mask_invert, inputs=inpaint_image, outputs=inpaint_image, queue=False)
+
                 with gr.Accordion("Presets (save / load JSON)", open=False):
                     gr.Markdown(
-                        "Download your current settings as JSON. Upload the file later to "
-                        "restore them. Images are optional (makes the file larger)."
+                        "Download prompt + all settings as JSON (no input images). "
+                        "Settings also auto-save on change and restore after reload. "
+                        "A copy is kept at `outputs/presets/last-session.json`."
                     )
-                    with gr.Row():
-                        preset_name = gr.Textbox(value="my-preset", label="Preset name")
-                        include_images = gr.Checkbox(
-                            label="Include images in JSON", value=False
-                        )
+                    preset_name = gr.Textbox(value="my-preset", label="Preset name")
                     with gr.Row():
                         save_preset_btn = gr.Button("Download preset JSON")
                         load_preset_file = gr.File(
@@ -809,21 +1183,22 @@ def build_ui() -> gr.Blocks:
                     show_download_button=True,
                     interactive=False,
                 )
-                with gr.Row():
-                    prev_btn = gr.Button("← Prev", size="sm")
-                    nav_label = gr.Textbox(
-                        value="0 / 0",
-                        label="Image",
-                        interactive=False,
-                        max_lines=1,
-                        scale=1,
-                    )
-                    next_btn = gr.Button("Next →", size="sm")
-                with gr.Row():
-                    fs_open = gr.Button("Fullscreen", size="sm", elem_id="fm-fs-open")
-                    mark_btn = gr.Button("Mark / unmark", size="sm")
-                    download_file = gr.File(label="Download current", interactive=False)
-                    clear_result = gr.Button("Clear session", size="sm")
+                with gr.Column(elem_id="result-controls"):
+                    with gr.Row():
+                        prev_btn = gr.Button("← Prev", size="sm")
+                        nav_label = gr.Textbox(
+                            value="0 / 0",
+                            label="Image",
+                            interactive=False,
+                            max_lines=1,
+                            scale=1,
+                        )
+                        next_btn = gr.Button("Next →", size="sm")
+                    with gr.Row():
+                        fs_open = gr.Button("Fullscreen", size="sm", elem_id="fm-fs-open")
+                        mark_btn = gr.Button("Mark / unmark", size="sm")
+                        download_file = gr.File(label="Download current", interactive=False)
+                        clear_result = gr.Button("Clear session", size="sm")
                 pick_status = gr.Textbox(
                     value="Marked: 0",
                     label="Selection",
@@ -840,32 +1215,21 @@ def build_ui() -> gr.Blocks:
                     clear_marks_btn = gr.Button("Clear marks", size="sm")
                 zip_file = gr.File(label="Marked ZIP", interactive=False)
                 status = gr.Textbox(label="Last job", interactive=False, lines=2)
-                cache_box = gr.Textbox(
-                    value="",
-                    visible=False,
-                    elem_id="fm-cache-box",
-                    label="cache",
-                )
-                cache_restore = gr.Button(
-                    "Restore cache",
-                    visible=False,
-                    elem_id="fm-cache-restore",
-                )
 
         with gr.Column(visible=False, elem_id="fm-fullscreen") as fs_panel:
             with gr.Column(elem_classes=["fm-fs-inner"]):
-                fs_image = gr.Image(
-                    label="Fullscreen",
-                    type="filepath",
-                    height=720,
-                    show_download_button=True,
-                    interactive=False,
-                )
-                with gr.Row():
+                with gr.Row(elem_classes=["fm-fs-toolbar"]):
                     fs_prev = gr.Button("← Prev", size="sm")
                     fs_nav = gr.Textbox(value="0 / 0", interactive=False, max_lines=1)
                     fs_next = gr.Button("Next →", size="sm")
                     fs_close = gr.Button("Close (Esc / click outside)", elem_id="fm-fs-close")
+                fs_image = gr.Image(
+                    label="Fullscreen",
+                    type="filepath",
+                    height=680,
+                    show_download_button=True,
+                    interactive=False,
+                )
 
         setting_controls = [
             prompt,
@@ -906,10 +1270,14 @@ def build_ui() -> gr.Blocks:
             ip4_weight,
             mix_ip_uov,
             mix_ip_inpaint,
+            inpaint_method,
             inpaint_prompt,
             inpaint_strength,
             inpaint_field,
             inpaint_engine,
+            inpaint_advanced_masking,
+            invert_mask,
+            inpaint_erode_or_dilate,
             outpaint,
             enhance_on,
             enhance_uov,
@@ -976,10 +1344,14 @@ def build_ui() -> gr.Blocks:
             mix_ip_inpaint,
             inpaint_image,
             inpaint_mask,
+            inpaint_method,
             inpaint_prompt,
             inpaint_strength,
             inpaint_field,
             inpaint_engine,
+            inpaint_advanced_masking,
+            invert_mask,
+            inpaint_erode_or_dilate,
             outpaint,
             enhance_on,
             enhance_image,
@@ -998,24 +1370,25 @@ def build_ui() -> gr.Blocks:
             save_local,
         ]
 
-        def _export_preset(include_imgs, name, *vals):
-            values = {k: v for k, v in zip(SETTING_KEYS, vals[: len(SETTING_KEYS)])}
-            img_vals = vals[len(SETTING_KEYS) :]
-            for k, v in zip(IMAGE_KEYS, img_vals):
-                values[k] = v
+        def _export_preset(name, *vals):
+            values = {k: v for k, v in zip(SETTING_KEYS, vals)}
+            # Always settings-only (no images in JSON).
+            hist, idx, marks, _ = _load_session_cache()
+            _persist_session(hist, idx, marks, values)
             PRESET_DIR.mkdir(parents=True, exist_ok=True)
             safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in (name or "preset"))
             path = PRESET_DIR / f"{safe}.json"
             path.write_text(
-                preset_to_json(values, include_images=bool(include_imgs), name=name or "preset"),
+                preset_to_json(values, include_images=False, name=name or "preset"),
                 encoding="utf-8",
             )
-            return path, f"Saved {path.name}"
+            return path, f"Saved {path.name} (settings only, no images)"
 
         def _import_preset(file_obj):
             empty = [gr.update() for _ in setting_controls] + [
-                gr.update() for _ in image_controls
-            ] + [gr.update(visible=False), "No file"]
+                gr.update(visible=False),
+                "No file",
+            ]
             if file_obj is None:
                 return empty
             path = file_obj if isinstance(file_obj, str) else getattr(file_obj, "name", None)
@@ -1025,36 +1398,44 @@ def build_ui() -> gr.Blocks:
                 parsed = parse_preset(Path(path).read_text(encoding="utf-8"))
             except Exception as exc:  # noqa: BLE001
                 return [gr.update() for _ in setting_controls] + [
-                    gr.update() for _ in image_controls
-                ] + [gr.update(visible=False), f"Load failed: {exc}"]
+                    gr.update(visible=False),
+                    f"Load failed: {exc}",
+                ]
 
             flat = settings_to_updates(parsed)
-            updates = []
-            for key in SETTING_KEYS:
-                if key in flat:
-                    updates.append(gr.update(value=flat[key]))
-                else:
-                    updates.append(gr.update())
-            for key in IMAGE_KEYS:
-                if key in flat and flat[key] is not None:
-                    updates.append(gr.update(value=flat[key]))
-                else:
-                    updates.append(gr.update())
-            input_on = bool(flat.get("input_image_on", False))
+            # Drop any legacy embedded images — session restore is settings-only.
+            settings = {k: flat[k] for k in SETTING_KEYS if k in flat}
+            hist, idx, marks, _ = _load_session_cache()
+            _persist_session(hist, idx, marks, settings)
+            updates = _setting_updates(settings)
+            input_on = bool(settings.get("input_image_on", False))
             updates.append(gr.update(visible=input_on))
-            updates.append(f"Loaded preset '{parsed.get('name')}'")
+            updates.append(f"Loaded preset '{parsed.get('name')}' (settings only)")
             return updates
 
         save_preset_btn.click(
             _export_preset,
-            inputs=[include_images, preset_name, *setting_controls, *image_controls],
+            inputs=[preset_name, *setting_controls],
             outputs=[preset_file_out, preset_status],
         )
         load_preset_file.change(
             _import_preset,
             inputs=[load_preset_file],
-            outputs=[*setting_controls, *image_controls, image_panel, preset_status],
+            outputs=[*setting_controls, image_panel, preset_status],
         )
+
+        def _autosave_settings(*vals):
+            values = {k: v for k, v in zip(SETTING_KEYS, vals)}
+            hist, idx, marks, _ = _load_session_cache()
+            _persist_session(hist, idx, marks, values)
+
+        for _ctrl in setting_controls:
+            _ctrl.change(
+                _autosave_settings,
+                inputs=setting_controls,
+                queue=False,
+                show_progress="hidden",
+            )
 
         def _refresh():
             ckpts, lora_names = list_remote_assets()
@@ -1094,7 +1475,6 @@ def build_ui() -> gr.Blocks:
                 gr.update(),  # picked
                 gr.update(),  # pick_box
                 gr.update(),  # pick_status
-                gr.update(),  # cache
             )
 
         def _empty_viewer():
@@ -1212,9 +1592,13 @@ def build_ui() -> gr.Blocks:
             except Exception as exc:  # noqa: BLE001
                 raise gr.Error(str(exc)) from exc
 
-        def _restore_cache(raw: str):
-            hist, idx, marks = _parse_cache(raw)
-            return _viewer_bundle(hist, idx, marks)
+        def _restore_session():
+            hist, idx, marks, settings = _load_session_cache()
+            bundle = _viewer_bundle(hist, idx, marks)
+            updates = _setting_updates(settings)
+            input_on = bool(settings.get("input_image_on", False))
+            updates.append(gr.update(visible=input_on))
+            return (*bundle, *updates)
 
         def _open_fs(history, index):
             hist = _alive_paths(history)
@@ -1247,9 +1631,16 @@ def build_ui() -> gr.Blocks:
             picked_state,
             pick_box,
             pick_status,
-            cache_box,
         ]
 
+        # Flush settings before/with Generate so reload keeps the last prompt even
+        # if Textbox change had not fired yet.
+        go.click(
+            _autosave_settings,
+            inputs=setting_controls,
+            queue=False,
+            show_progress="hidden",
+        )
         go.click(
             _run_job,
             inputs=[history_state, index_state, picked_state, *generate_inputs],
@@ -1315,16 +1706,9 @@ def build_ui() -> gr.Blocks:
             outputs=[zip_file],
             queue=False,
         )
-        cache_restore.click(
-            _restore_cache,
-            inputs=[cache_box],
-            outputs=viewer_outs,
-            queue=False,
-        )
         demo.load(
-            _restore_cache,
-            inputs=[cache_box],
-            outputs=viewer_outs,
+            _restore_session,
+            outputs=[*viewer_outs, *setting_controls, image_panel],
             queue=False,
         )
         fs_open.click(

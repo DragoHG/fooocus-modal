@@ -157,14 +157,14 @@ def build_async_task_args(params: GenerateParams) -> list[Any]:
             1.02,
             0.99,
             0.95,
-            False,
-            False,
+            False,  # debugging_inpaint_preprocessor
+            bool(params.inpaint_disable_initial_latent),
             params.inpaint_engine or getattr(cfg, "default_inpaint_engine_version", "v2.6"),
             float(params.inpaint_strength),
             float(params.inpaint_respective_field),
-            bool(params.inpaint_mask_b64),
-            False,
-            0,
+            bool(params.inpaint_advanced_masking),
+            bool(params.invert_mask),
+            int(params.inpaint_erode_or_dilate or 0),
         ]
     )
 

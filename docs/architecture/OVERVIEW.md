@@ -4,13 +4,14 @@
 
 **Author:** Fabio "Drago" Monreal - [LinkedIn](https://www.linkedin.com/in/fabiomonreal/) · [Website](https://fabio-monreal.vercel.app/en) · fabio.monreal@outlook.com
 
+End-user walkthrough: [User guide](../USER_GUIDE.md).
+
 ## Goals
 
 - Pay for GPU only while a job runs
 - Keep the cloud worker lean (Fooocus worker only; no Gradio in the cloud)
-- Faster cold starts via memory snapshots; checkpoints load from the Volume when needed
 - Durable models on a Volume; optional ephemeral generation media
-- Full Fooocus-style image tools locally, including presets you can save and reload
+- Full Fooocus-style image tools locally, including brush inpaint, presets, and session restore
 
 ## Context diagram
 
@@ -19,6 +20,7 @@ flowchart LR
   subgraph workstation [Workstation]
     UI[local Gradio]
     Presets[preset JSON]
+    Session[session cache]
     Manifest[models.txt]
   end
   subgraph modalPlatform [Modal]
@@ -27,6 +29,7 @@ flowchart LR
   end
   UI -->|generate remote| Worker
   Presets -.->|save / load| UI
+  Session -.->|reload restore| UI
   Manifest -->|sync_models| Vol
   Worker --> Vol
   Worker -->|image bytes| UI
@@ -39,13 +42,14 @@ flowchart LR
 3. The worker reads models from the Volume, runs Fooocus headless, returns image bytes.
 4. After `SCALEDOWN_WINDOW` with no work, containers scale to zero.
 5. With `ZERO_TELEMETRY=true`, generation media is not kept on the Volume.
+6. Locally, settings + gallery paths persist under `outputs/` for the next page load.
 
 ## Components
 
 | Component | Responsibility |
 |-----------|----------------|
-| `local/ui.py` | Studio UI, presets, Modal client |
-| `local/presets.py` | Save / load JSON settings |
+| `local/ui.py` | Studio UI, inpaint editor, session cache, Modal client |
+| `local/presets.py` | Save / load JSON settings (no images by default) |
 | `modal_app/app.py` | Image build, Volume, worker, sync |
 | `src/manifest.py` | Model manifest parse / download |
 | `src/generate_params.py` | Shared generation schema |
@@ -57,7 +61,7 @@ See `.env.example` for `MODAL_GPUS`, `SCALEDOWN_WINDOW`, `ZERO_TELEMETRY`, and s
 
 ## FinOps notes
 
-- Do not enable memory snapshots until a CUDA-safe snap path exists ([COLD_START.md](COLD_START.md))
+- Memory snapshots stay off until a CUDA-safe snap path exists ([COLD_START.md](COLD_START.md))
 - Model listing uses a CPU function; only `generate` should wake the GPU
 - See [VERIFICATION.md](VERIFICATION.md) for the last known-good remote check
 
