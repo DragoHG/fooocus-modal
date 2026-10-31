@@ -1490,7 +1490,15 @@ def build_ui() -> gr.Blocks:
 
         def _run_job(history, index, picked, *args):
             """Keep every queued Generate; append results to session history."""
-            tip = (args[0] or "").strip().replace("\n", " ") if args else ""
+            # args = setting_controls (for autosave) + generate_inputs
+            n_settings = len(SETTING_KEYS)
+            setting_vals = args[:n_settings]
+            gen_args = args[n_settings:]
+            try:
+                _autosave_settings(*setting_vals)
+            except Exception:
+                pass
+            tip = (gen_args[0] or "").strip().replace("\n", " ") if gen_args else ""
             if len(tip) > 80:
                 tip = tip[:77] + "..."
             hist = _alive_paths(history)
@@ -1504,7 +1512,7 @@ def build_ui() -> gr.Blocks:
                 gr.update(),
             )
             try:
-                paths, info = generate(*args)
+                paths, info = generate(*gen_args)
             except Exception as exc:  # noqa: BLE001
                 bundle = _viewer_bundle(hist, index, marks)
                 yield (
@@ -1633,17 +1641,11 @@ def build_ui() -> gr.Blocks:
             pick_status,
         ]
 
-        # Flush settings before/with Generate so reload keeps the last prompt even
-        # if Textbox change had not fired yet.
-        go.click(
-            _autosave_settings,
-            inputs=setting_controls,
-            queue=False,
-            show_progress="hidden",
-        )
+        # One click handler only: Gradio 4 breaks a second go.click (0 inputs).
+        # Settings are flushed inside _run_job before generate().
         go.click(
             _run_job,
-            inputs=[history_state, index_state, picked_state, *generate_inputs],
+            inputs=[history_state, index_state, picked_state, *setting_controls, *generate_inputs],
             outputs=[
                 *viewer_outs,
                 status,

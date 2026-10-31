@@ -31,15 +31,27 @@ def _b64_to_numpy(image_b64: str | None) -> np.ndarray | None:
 
 
 def _inpaint_payload(image_b64: str | None, mask_b64: str | None) -> dict | None:
+    """Fooocus expects mask as HWC (it indexes mask[:, :, 0])."""
     image = _b64_to_numpy(image_b64)
     if image is None:
         return None
+    h, w = image.shape[:2]
     if mask_b64:
         mask = _b64_to_numpy(mask_b64)
-        if mask is not None and mask.ndim == 3:
+        if mask is None:
+            mask = np.zeros((h, w), dtype=np.uint8)
+        elif mask.ndim == 3:
             mask = mask[:, :, 0]
+        if mask.shape[:2] != (h, w):
+            mask_img = Image.fromarray(mask.astype(np.uint8), mode="L").resize(
+                (w, h), Image.Resampling.NEAREST
+            )
+            mask = np.array(mask_img)
     else:
-        mask = np.zeros(image.shape[:2], dtype=np.uint8)
+        mask = np.zeros((h, w), dtype=np.uint8)
+    # AsyncTask.apply_image_input does mask[:, :, 0] — keep 3 channels.
+    if mask.ndim == 2:
+        mask = np.stack([mask, mask, mask], axis=-1)
     return {"image": image, "mask": mask}
 
 

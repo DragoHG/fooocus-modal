@@ -4,6 +4,18 @@ Newest entries first. Format enforced by skill `audit-trail`.
 
 ## [Unreleased]
 
+### 2026-10-31 - Fix inpaint mask shape for Fooocus worker
+
+- **What:** `_inpaint_payload` now always sends an HWC mask (Fooocus indexes `mask[:, :, 0]`).
+- **Why:** 2D masks caused `IndexError: too many indices for array` on generate.
+- **Paths:** `src/fooocus_task.py`
+
+### 2026-10-31 - Fix Generate blocked by dual click autosave
+
+- **What:** Removed the second `go.click` autosave on Generate; settings now flush inside the single generate handler.
+- **Why:** Gradio 4 raised `needed: 62, got: 0` on `_autosave_settings`, so Generate never reached the worker.
+- **Paths:** `local/ui.py`
+
 ### 2026-10-31 - Fooocus inpaint/outpaint polish and public docs
 
 - **What:** Inpaint Method (default / Improve Detail / Modify Content), white brush mask tools (fill/clear/invert), advanced mask upload + invert + erode/dilate wired to the worker; dark sticky toolbars so controls stay readable over images; consolidated end-user guide and contributor docs.
