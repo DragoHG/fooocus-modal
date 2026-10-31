@@ -1,0 +1,16 @@
+---
+description: Lightweight security and governance expectations
+alwaysApply: true
+---
+
+# Security and governance (lightweight)
+
+Align with common secure-development practice without heavy process:
+
+- Secrets only via `.env` (gitignored) or Modal secrets; never hardcode.
+- Least privilege: UI local; remote worker only receives generation params and needed bytes.
+- Validate/sanitize paths from `models.txt` (no path traversal into unexpected dirs).
+- Prefer HTTPS download URLs for models; skip or warn on cleartext if avoidable.
+- Do not log prompts/images when `ZERO_TELEMETRY=true`.
+- Dependency pins in requirements where practical; document notable upgrades in the audit log.
+- Threat model stays simple: protect credentials, Volume contents, and accidental data retention.

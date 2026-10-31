@@ -1,0 +1,13 @@
+---
+description: Mandatory change audit trail in docs/audit
+alwaysApply: true
+---
+
+# Audit trail
+
+After any meaningful development change (structure, docs, config, code, plans):
+
+1. Append an entry to `docs/audit/CHANGELOG.md` (newest first under the current version heading, or a dated Unreleased section).
+2. Each item: date, short title, what changed, why, paths touched.
+3. Keep entries factual and free of tooling provenance fluff.
+4. Use skill `audit-trail` when unsure of the format.

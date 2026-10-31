@@ -1,0 +1,13 @@
+---
+description: Core project constraints for fooocus-on-modal agents
+alwaysApply: true
+---
+
+# Core
+
+- Language with the user: Portuguese unless they write in another language.
+- Prefer small, reviewable diffs; match existing style once code exists.
+- Do not invent secrets; never commit `.env`, `models.txt`, tokens, or credentials.
+- Runtime code comes after structure/docs for the feature under work.
+- Prefer FinOps defaults: scale to zero, short idle window, no warm GPU pool.
+- Env flag for ephemeral I/O is `ZERO_TELEMETRY` (not legacy names).

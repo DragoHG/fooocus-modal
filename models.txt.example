@@ -1,0 +1,8 @@
+# type<TAB>relative_filename<TAB>url
+# Copy to models.txt and edit. models.txt is gitignored.
+#
+# Types: checkpoint, lora, vae, embedding, vae_approx, upscale, inpaint,
+#        controlnet, clip_vision, expansion, safety_checker, sam
+#
+# Example:
+# checkpoint	juggernautXL_v8Rundiffusion.safetensors	https://huggingface.co/lllyasviel/fav_models/resolve/main/fav/juggernautXL_v8Rundiffusion.safetensors

@@ -1,0 +1,33 @@
+# Local secrets and private manifests
+.env
+.env.local
+models.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local generation outputs (optional saves)
+outputs/*
+!outputs/.gitkeep
+
+# OS / editor clutter
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Modal local noise
+.modal/
+
+# Ad-hoc notes
+*.log

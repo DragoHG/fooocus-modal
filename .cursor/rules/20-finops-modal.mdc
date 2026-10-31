@@ -1,0 +1,15 @@
+---
+description: FinOps and Modal worker lifecycle defaults
+alwaysApply: true
+---
+
+# FinOps / Modal
+
+- Local UI is CPU-only; GPU work runs only on Modal under demand.
+- `min_containers=0`, `buffer_containers=0`.
+- Default `SCALEDOWN_WINDOW=60` (seconds). Prefer shorter idle over warm GPUs.
+- GPU preference order: `L4`, then `A10` (24GB class). Keep list configurable via `MODAL_GPUS`.
+- Models stay on Modal Volume; do not bake large weights into the Image.
+- `ZERO_TELEMETRY=true` (default): inputs/outputs stay ephemeral (`/tmp` or return bytes); do not grow the Volume with media.
+- `ZERO_TELEMETRY=false`: allow persisting inputs/outputs under the Volume paths.
+- No always-on GPU web UI; invoke via on-demand remote calls.

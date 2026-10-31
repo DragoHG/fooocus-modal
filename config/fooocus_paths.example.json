@@ -1,0 +1,15 @@
+{
+  "path_checkpoints": ["/vol/models/checkpoints/"],
+  "path_loras": ["/vol/models/loras/"],
+  "path_embeddings": "/vol/models/embeddings/",
+  "path_vae_approx": "/vol/models/vae_approx/",
+  "path_vae": "/vol/models/vae/",
+  "path_upscale_models": "/vol/models/upscale_models/",
+  "path_inpaint": "/vol/models/inpaint/",
+  "path_controlnet": "/vol/models/controlnet/",
+  "path_clip_vision": "/vol/models/clip_vision/",
+  "path_fooocus_expansion": "/vol/models/prompt_expansion/fooocus_expansion",
+  "path_safety_checker": "/vol/models/safety_checker/",
+  "path_sam": "/vol/models/sam/",
+  "path_outputs": "/tmp/fooocus_io/outputs"
+}
