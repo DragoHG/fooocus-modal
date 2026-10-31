@@ -24,7 +24,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 done
 
 if [[ "$status" -ne 0 ]]; then
-  echo "pre-push: blocked — fix authorship before pushing to the canonical remote." >&2
+  echo "pre-push: blocked - fix authorship before pushing to the canonical remote." >&2
   exit 1
 fi
 exit 0

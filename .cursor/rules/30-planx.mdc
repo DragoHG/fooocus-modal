@@ -10,7 +10,7 @@ Whenever a plan is created, updated, or confirmed:
 1. Write a markdown copy into `.cursor/planx/`.
 2. Filename: `YYYYMMDD-HHMM-<slug>.md` (UTC or local wall clock is fine if consistent).
 3. Include frontmatter: `name`, `overview`, `updated`, optional `status`.
-4. If iterating an existing plan, add a new file (do not silently overwrite history) **or** append a dated section at the top of the same slug file—prefer a new dated file for auditability.
+4. If iterating an existing plan, add a new file (do not silently overwrite history) **or** append a dated section at the top of the same slug file - prefer a new dated file for auditability.
 5. Mention the archived path in the audit changelog when the plan materializes or changes scope.
 
 Do not leave the only copy of a plan outside this repository.

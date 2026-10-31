@@ -15,10 +15,10 @@ After meaningful changes land in the working tree (even before commit).
 2. Under `## [Unreleased]` (create if missing), prepend:
 
 ```markdown
-### YYYY-MM-DD — <short title>
+### YYYY-MM-DD - <short title>
 
-- **What:** …
-- **Why:** …
+- **What:** ...
+- **Why:** ...
 - **Paths:** `path/a`, `path/b`
 ```
 

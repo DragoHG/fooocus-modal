@@ -1,4 +1,4 @@
-"""Container-side Fooocus bootstrap — lean serverless init (no Gradio)."""
+"""Container-side Fooocus bootstrap - lean serverless init (no Gradio)."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def write_fooocus_config() -> Path:
 
 
 def prepare_sys_argv() -> None:
-    # Minimal flags: headless worker only — no browser, analytics, or preset pulls.
+    # Minimal flags: headless worker only - no browser, analytics, or preset pulls.
     argv = [
         "launch.py",
         "--disable-analytics",
@@ -95,5 +95,5 @@ def init_fooocus() -> None:
 
     shared.gradio_root = None
 
-    # Starts the daemon worker thread only — no Gradio, no web server.
+    # Starts the daemon worker thread only - no Gradio, no web server.
     import modules.async_worker  # noqa: F401

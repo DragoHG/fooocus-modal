@@ -2,81 +2,62 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Fooocus on Modal, built for cost control.** Run a local interface, fire GPU jobs only when you generate, and shut the worker down when you stop—so idle time does not burn budget.
+**Fooocus quality. Modal economics.** Generate from a local app; the GPU wakes for the job and sleeps when you stop. Idle time does not keep a bill running.
 
-Models stay on a Modal Volume. Generation media does not have to. Defaults favor FinOps: scale to zero, short idle window, optional zero retention of inputs and outputs on disk.
-
-> **Status:** Runtime ready — Fooocus-parity local UI, lean Modal worker, Volume sync. Requires Modal token once per machine.
+Models stay on cloud storage. Your images stay on your machine by default.
 
 ## Author
 
 **Fabio "Drago" Monreal**  
 [Email](mailto:fabio.monreal@outlook.com) · [LinkedIn](https://www.linkedin.com/in/fabiomonreal/) · [Website](https://fabio-monreal.vercel.app/en) · [GitHub](https://github.com/DragoHG) · [Repository](https://github.com/DragoHG/fooocus-modal)
 
-## Why this project
+## What you get
 
-- Pay for GPU only while work is running
-- Keep checkpoints and LoRAs durable; keep media ephemeral by default
-- Operate from your laptop UI; leave heavy compute on Modal
-- Stay configurable: GPU fallback list, idle window, retention flag
-
-## Capabilities
-
-- Local Fooocus-style UI → lean Modal GPU worker (no Gradio on Modal)
-- Input Image: Upscale/Vary, Image Prompt (**FaceSwap**, Canny, CPDS), Inpaint/Outpaint, Enhance
-- GPU preference `L4` → `A10`; memory snapshots for faster cold starts (`ENABLE_MEMORY_SNAPSHOT`)
-- Custom models via private `models.txt` (default light LoRA + Juggernaut + IP-Adapter assets)
-- `ZERO_TELEMETRY=true` by default — no generation I/O retained on the Volume
-- Default performance **Lightning** for cheaper/faster generations
+- Local studio UI with Fooocus-style controls (text, styles, LoRAs, FaceSwap, inpaint, outpaint, enhance)
+- Advanced sampling knobs when you want them (sampler, scheduler, CLIP skip, ADM, adaptive CFG)
+- **Preset JSON**: download your setup, upload it later to restore the same look
+- On-demand GPU (`L4` then `A10`) with scale-to-zero
+- Optional zero retention of generation media in the cloud (`ZERO_TELEMETRY`)
 
 ## Quick start
 
 ```bash
 cp .env.example .env
-cp models.txt.example models.txt   # or edit models.txt
+cp models.txt.example models.txt
 
-# Prefer a venv (example with uv)
 uv venv .venv && source .venv/bin/activate
 uv pip install -r requirements-local.txt
 
-# Auth once
 modal token new
-
-# 1) Download models into the Modal Volume (CPU)
 modal run modal_app/app.py --action sync
-
-# 2) Deploy the GPU worker (scales to zero when idle)
 modal deploy modal_app/app.py
-
-# 3) Local UI
 python local/ui.py
 ```
 
-Open `http://127.0.0.1:7860`. Enable **Input Image** for Fooocus image tools. The first Generate after idle may cold-start; after ~`SCALEDOWN_WINDOW` seconds idle, GPU billing stops.
+Open `http://127.0.0.1:7860`. Use **Presets** in the UI to download or upload a JSON settings file.
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `ZERO_TELEMETRY` | `true` | Do not store inputs/outputs on the Volume |
-| `SCALEDOWN_WINDOW` | `60` | Idle seconds before GPU scale-down |
-| `ENABLE_MEMORY_SNAPSHOT` | `true` | Faster cold restore of imports |
-| `ENABLE_GPU_SNAPSHOT` | `false` | Experimental VRAM snapshot (usually off) |
-| `MODAL_GPUS` | `L4,A10` | Ordered GPU fallback list |
+| `ZERO_TELEMETRY` | `true` | Keep generation media off the Volume |
+| `SCALEDOWN_WINDOW` | `60` | Seconds idle before the GPU stops |
+| `ENABLE_MEMORY_SNAPSHOT` | `true` | Faster cold start |
+| `MODAL_GPUS` | `L4,A10` | GPU preference order |
 | `MODAL_APP_NAME` | `fooocus-modal` | Modal app name |
 
 ## Documentation
 
-- [Architecture overview](docs/architecture/OVERVIEW.md)
+- [Architecture](docs/architecture/OVERVIEW.md)
 - [Cold start](docs/architecture/COLD_START.md)
 - [Directory map](docs/architecture/DIRECTORY.md)
 - [ZERO_TELEMETRY](docs/architecture/ZERO_TELEMETRY.md)
-- [Governance](docs/governance/POLICY.md)
-- [Audit changelog](docs/audit/CHANGELOG.md)
+- [Product principles](docs/governance/POLICY.md)
+- [Changelog](docs/audit/CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE).
 
 ## Acknowledgements
 

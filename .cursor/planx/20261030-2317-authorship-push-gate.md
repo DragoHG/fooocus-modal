@@ -13,7 +13,7 @@ Canonical remote must never show non-maintainer contributors from tooling co-aut
 
 ## Deliverables
 
-- `scripts/check_git_authorship.sh` — validates author/committer email and banned message patterns
-- `.githooks/{prepare-commit-msg,commit-msg,pre-push}` — strip/reject/block
+- `scripts/check_git_authorship.sh` - validates author/committer email and banned message patterns
+- `.githooks/{prepare-commit-msg,commit-msg,pre-push}` - strip/reject/block
 - Stronger `.cursor/rules/10-git-authorship.mdc` + release-hygiene skill + CONTRIBUTING note
 - Enable `core.hooksPath=.githooks` locally; push clean history to recreated GitHub repo

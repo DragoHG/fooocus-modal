@@ -11,3 +11,4 @@ alwaysApply: true
 - Runtime code comes after structure/docs for the feature under work.
 - Prefer FinOps defaults: scale to zero, short idle window, no warm GPU pool.
 - Env flag for ephemeral I/O is `ZERO_TELEMETRY` (not legacy names).
+- Prefer plain ASCII punctuation in user-facing and repo text (`-`, `...`); do not use em dashes (`—`) or curly ellipsis (`…`).

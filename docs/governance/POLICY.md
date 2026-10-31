@@ -1,42 +1,30 @@
-# Governance policy (lightweight)
+# Product principles
 
 ## Purpose
 
-Keep the project maintainable, cost-aware, and safe enough for a single-maintainer serverless ML workload—without enterprise ceremony.
+Run Fooocus on Modal with a local UI, pay for GPU only while work runs, and keep day-to-day operation simple.
 
-## Roles
+## Product owner
 
-- **Author / maintainer**: Fabio "Drago" Monreal — `fabio.monreal@outlook.com` — [LinkedIn](https://www.linkedin.com/in/fabiomonreal/) — [Website](https://fabio-monreal.vercel.app/en)
-- **GitHub**: [DragoHG/fooocus-modal](https://github.com/DragoHG/fooocus-modal)
-- **Maintainer git identity** (direct commits): `DragoHG <fabio.monreal@outlook.com>`
-- **License**: MIT (see `LICENSE`).
-- **Canonical remote**: `https://github.com/DragoHG/fooocus-modal.git`
+**Fabio "Drago" Monreal** · [Email](mailto:fabio.monreal@outlook.com) · [LinkedIn](https://www.linkedin.com/in/fabiomonreal/) · [Website](https://fabio-monreal.vercel.app/en)
 
-## Change control
+Repository: [DragoHG/fooocus-modal](https://github.com/DragoHG/fooocus-modal) (MIT)
 
-1. Prefer plan → structure → implementation.
-2. Archive plans under `.cursor/planx/`.
-3. Record alterations in `docs/audit/CHANGELOG.md`.
-4. Commits only with the maintainer identity above.
-5. No remote push unless the maintainer requests it.
+## Operating defaults
 
-## Contribution hygiene
+- GPU workers scale to zero when idle
+- Models stay on a Modal Volume; generation media stays ephemeral unless you opt in
+- Local UI drives on-demand remote generation (no always-on cloud Gradio)
+- Prefer short idle windows and an ordered GPU fallback list
 
-Release artifacts and history should look like ordinary maintainer work. Omit IDE/assistant/tooling attribution from source, docs, and commit messages. Treat leftover generator banners or “written by …” footnotes as defects to remove before commit.
+## Change discipline
 
-## Data and FinOps
-
-- Default `ZERO_TELEMETRY=true`: no retention of generation inputs/outputs on the Modal Volume.
-- Models on Volume are intentional durable state; media is not, unless telemetry is disabled flag is turned off.
-- Scale-to-zero is mandatory for GPU workers (`min_containers=0`).
+- Prefer clarify → document → implement for non-trivial work
+- Record meaningful changes in `docs/audit/CHANGELOG.md`
+- Keep secrets (`.env`, private `models.txt`, tokens) out of git
 
 ## Security baseline
 
-- Secrets out of git.
-- Manifest downloads constrained to known model subfolders.
-- Avoid logging user media/prompts under zero-telemetry mode.
-- Document security-relevant changes in the audit log.
-
-## References
-
-Inspired by pragmatic subsets of secure SDLC practice (threat-aware defaults, least privilege, change traceability)—applied at small-project scale.
+- Constrain model downloads to known Volume folders
+- Avoid logging prompts or media when retention is off
+- Report security issues via [SECURITY.md](../../SECURITY.md)

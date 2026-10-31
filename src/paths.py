@@ -5,8 +5,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-VOL_ROOT = Path(os.environ.get("FOOOCUS_VOL_ROOT", "/vol"))
-EPHEMERAL_ROOT = Path(os.environ.get("FOOOCUS_EPHEMERAL_ROOT", "/tmp/fooocus_io"))
+def vol_root() -> Path:
+    return Path(os.environ.get("FOOOCUS_VOL_ROOT", "/vol"))
+
+
+def ephemeral_root() -> Path:
+    return Path(os.environ.get("FOOOCUS_EPHEMERAL_ROOT", "/tmp/fooocus_io"))
+
 
 MODEL_SUBDIRS = {
     "checkpoint": "models/checkpoints",
@@ -34,17 +39,17 @@ def zero_telemetry_enabled() -> bool:
 
 
 def models_root() -> Path:
-    return VOL_ROOT / "models"
+    return vol_root() / "models"
 
 
 def model_dir(kind: str) -> Path:
     if kind not in MODEL_SUBDIRS:
         raise ValueError(f"Unknown model kind: {kind}")
-    return VOL_ROOT / MODEL_SUBDIRS[kind]
+    return vol_root() / MODEL_SUBDIRS[kind]
 
 
 def io_root() -> Path:
-    return EPHEMERAL_ROOT if zero_telemetry_enabled() else VOL_ROOT
+    return ephemeral_root() if zero_telemetry_enabled() else vol_root()
 
 
 def outputs_dir() -> Path:
@@ -60,7 +65,7 @@ def ensure_layout() -> None:
         model_dir(kind).mkdir(parents=True, exist_ok=True)
     outputs_dir().mkdir(parents=True, exist_ok=True)
     inputs_dir().mkdir(parents=True, exist_ok=True)
-    EPHEMERAL_ROOT.mkdir(parents=True, exist_ok=True)
+    ephemeral_root().mkdir(parents=True, exist_ok=True)
 
 
 def fooocus_config_dict() -> dict:

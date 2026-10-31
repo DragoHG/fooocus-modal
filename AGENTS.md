@@ -1,4 +1,4 @@
-# Agent guide — fooocus-modal
+# Agent guide - fooocus-modal
 
 This repository (`fooocus-modal`, https://github.com/DragoHG/fooocus-modal) runs Fooocus inference on Modal (serverless GPU) with a local Gradio UI.
 Agents working here must follow project rules under `.cursor/rules/` and skills under `.cursor/skills/`.
@@ -11,9 +11,9 @@ Deliver a FinOps-first Fooocus worker: local UI triggers on-demand GPU work; idl
 
 ## Runtime map
 
-- `modal_app/app.py` — Modal deploy entry (`FooocusWorker`, `sync_models`)
-- `local/ui.py` — Gradio client → `FooocusWorker.generate.remote`
-- `src/` — paths, manifest, params, Fooocus task builder
+- `modal_app/app.py` - Modal deploy entry (`FooocusWorker`, `sync_models`)
+- `local/ui.py` - Gradio client → `FooocusWorker.generate.remote`
+- `src/` - paths, manifest, params, Fooocus task builder
 
 ## Read first
 
@@ -46,4 +46,4 @@ Deliver a FinOps-first Fooocus worker: local UI triggers on-demand GPU work; idl
 
 ## Config surface
 
-See `.env.example`. Key flag: `ZERO_TELEMETRY` (default `true`) — when enabled, do not persist generation inputs/outputs on the Modal Volume.
+See `.env.example`. Key flag: `ZERO_TELEMETRY` (default `true`) - when enabled, do not persist generation inputs/outputs on the Modal Volume.

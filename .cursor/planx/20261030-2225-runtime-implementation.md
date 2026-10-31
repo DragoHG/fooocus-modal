@@ -10,9 +10,9 @@ status: done
 ## Delivered
 
 - `src/paths.py`, `manifest.py`, `generate_params.py`, `fooocus_task.py`
-- `modal_app/app.py` — `sync_models`, `FooocusWorker.generate/list_assets`
-- `modal_app/bootstrap.py` — Fooocus init without Gradio
-- `local/ui.py` — Gradio client
+- `modal_app/app.py` - `sync_models`, `FooocusWorker.generate/list_assets`
+- `modal_app/bootstrap.py` - Fooocus init without Gradio
+- `local/ui.py` - Gradio client
 - `tests/test_manifest.py`
 
 ## Ops

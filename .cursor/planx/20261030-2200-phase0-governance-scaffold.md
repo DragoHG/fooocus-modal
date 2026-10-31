@@ -1,11 +1,11 @@
 ---
 name: Phase 0 governance scaffold
-overview: Documentação de alto nível, regras, skills, planx, auditoria e templates — sem código runtime.
+overview: Documentação de alto nível, regras, skills, planx, auditoria e templates - sem código runtime.
 updated: 2026-10-30T22:00:00-03:00
 status: done
 ---
 
-# Phase 0 — governance and structure
+# Phase 0 - governance and structure
 
 ## Scope
 

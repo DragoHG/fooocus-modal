@@ -30,7 +30,7 @@ After commit (and before any push):
 scripts/check_git_authorship.sh
 ```
 
-If the check fails, amend only when allowed by maintainer commit rules, or create a corrected new commit — never push a failing range.
+If the check fails, amend only when allowed by maintainer commit rules, or create a corrected new commit - never push a failing range.
 
 ## Hooks
 

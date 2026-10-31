@@ -1,11 +1,19 @@
-# local
+# Local UI
 
-CPU Gradio UI that calls the deployed Modal `FooocusWorker`.
+Gradio studio that talks to the deployed Modal `FooocusWorker`.
 
 ```bash
-cp ../.env.example ../.env
-# modal deploy ../modal_app/app.py
-python ui.py
+python local/ui.py
 ```
 
-Open `http://127.0.0.1:7860` (defaults from `.env`).
+Open `http://127.0.0.1:7860`.
+
+## Features
+
+- Prompt, styles, performance, aspect, seed, sharpness, guidance
+- Checkpoint, refiner, five LoRAs
+- Sampling and guidance overrides
+- Input Image: Upscale/Vary, Image Prompt (FaceSwap), Inpaint/Outpaint, Enhance
+- **Presets**: download JSON settings; upload to restore (optional images)
+
+Results can be saved under `LOCAL_OUTPUT_DIR` (default `./outputs`). Presets land in `outputs/presets/`.

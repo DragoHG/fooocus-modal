@@ -116,7 +116,7 @@ _cls_kwargs: dict = {
     "enable_memory_snapshot": ENABLE_MEMORY_SNAPSHOT,
 }
 if ENABLE_GPU_SNAPSHOT:
-    # Experimental: large SDXL snapshots — off by default; enable via .env if desired.
+    # Experimental: large SDXL snapshots - off by default; enable via .env if desired.
     _cls_kwargs["experimental_options"] = {"enable_gpu_snapshot": True}
 
 
