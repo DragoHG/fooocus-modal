@@ -1,7 +1,18 @@
 # modal_app
 
-Modal application package.
+Modal application for **fooocus-modal**.
 
-Planned entrypoint: `app.py` (Image, Volume, `FooocusWorker`, `sync_models`).
+## Commands
 
-Not implemented in phase 0.
+```bash
+# Populate Volume from models.txt (CPU)
+modal run modal_app/app.py --action sync
+
+# Deploy worker
+modal deploy modal_app/app.py
+
+# Optional: list models on a warm/cold worker
+modal run modal_app/app.py --action list
+```
+
+Entrypoint: [`app.py`](app.py) (`FooocusWorker`, `sync_models`).

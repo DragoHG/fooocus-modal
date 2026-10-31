@@ -6,7 +6,7 @@
 
 Models stay on a Modal Volume. Generation media does not have to. Defaults favor FinOps: scale to zero, short idle window, optional zero retention of inputs and outputs on disk.
 
-> **Status:** Phase 0 — foundation and governance in place. Inference worker and local UI land next.
+> **Status:** Runtime scaffold ready — sync models, deploy worker, run local UI. First GPU generation requires Modal auth + `models.txt`.
 
 ## Author
 
@@ -20,12 +20,41 @@ Models stay on a Modal Volume. Generation media does not have to. Defaults favor
 - Operate from your laptop UI; leave heavy compute on Modal
 - Stay configurable: GPU fallback list, idle window, retention flag
 
-## Planned capabilities
+## Capabilities
 
 - Local Gradio UI calling an on-demand Modal worker
 - GPU preference `L4` → `A10` (24GB class), overridable
 - Custom model set via private `models.txt` (not committed)
 - `ZERO_TELEMETRY=true` by default — no generation I/O retained on the Volume
+
+## Quick start
+
+```bash
+cp .env.example .env
+cp models.txt.example models.txt
+# uncomment / add checkpoint + LoRA URLs in models.txt
+
+pip install -r requirements-local.txt
+modal setup   # once per machine
+
+# 1) Download models into the Modal Volume (CPU)
+modal run modal_app/app.py --action sync
+
+# 2) Deploy the GPU worker (scales to zero when idle)
+modal deploy modal_app/app.py
+
+# 3) Local UI
+python local/ui.py
+```
+
+Open `http://127.0.0.1:7860`, enter a prompt, click **Generate**. The first call may cold-start the GPU; after ~`SCALEDOWN_WINDOW` seconds idle, the worker stops billing compute.
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `ZERO_TELEMETRY` | `true` | Do not store inputs/outputs on the Volume |
+| `SCALEDOWN_WINDOW` | `60` | Idle seconds before GPU scale-down |
+| `MODAL_GPUS` | `L4,A10` | Ordered GPU fallback list |
+| `MODAL_APP_NAME` | `fooocus-modal` | Modal app name |
 
 ## Documentation
 
@@ -36,23 +65,6 @@ Models stay on a Modal Volume. Generation media does not have to. Defaults favor
 - [Audit changelog](docs/audit/CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)
-
-## Quick start (after runtime lands)
-
-```bash
-cp .env.example .env
-cp models.txt.example models.txt
-# edit models.txt with your download URLs
-pip install -r requirements-local.txt
-# modal setup && modal deploy ... && python local/ui.py
-```
-
-| Variable | Default | Meaning |
-|----------|---------|---------|
-| `ZERO_TELEMETRY` | `true` | Do not store inputs/outputs on the Volume |
-| `SCALEDOWN_WINDOW` | `60` | Idle seconds before GPU scale-down |
-| `MODAL_GPUS` | `L4,A10` | Ordered GPU fallback list |
-| `MODAL_APP_NAME` | `fooocus-modal` | Modal app name |
 
 ## License
 

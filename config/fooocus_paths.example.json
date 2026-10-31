@@ -11,5 +11,5 @@
   "path_fooocus_expansion": "/vol/models/prompt_expansion/fooocus_expansion",
   "path_safety_checker": "/vol/models/safety_checker/",
   "path_sam": "/vol/models/sam/",
-  "path_outputs": "/tmp/fooocus_io/outputs"
+  "path_outputs": "/tmp/fooocus_io/outputs/"
 }

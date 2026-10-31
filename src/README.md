@@ -1,9 +1,10 @@
 # src
 
-Shared helpers for the local UI and Modal worker.
+Shared libraries used by the Modal worker and local UI.
 
-Planned modules (not implemented in phase 0):
-
-- `manifest.py` — parse/download `models.txt`
-- `paths.py` — Volume layout and `ZERO_TELEMETRY` path selection
-- `generate_params.py` — shared generation schema
+| Module | Role |
+|--------|------|
+| `paths.py` | Volume layout + `ZERO_TELEMETRY` I/O roots |
+| `manifest.py` | Parse/download `models.txt` |
+| `generate_params.py` | Request/response dataclasses |
+| `fooocus_task.py` | Build Fooocus `AsyncTask` args and run generation |

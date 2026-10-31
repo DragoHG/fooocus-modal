@@ -9,6 +9,12 @@ Agents working here must follow project rules under `.cursor/rules/` and skills 
 
 Deliver a FinOps-first Fooocus worker: local UI triggers on-demand GPU work; idle scales to zero; models live on a Modal Volume; optional ephemeral I/O via `ZERO_TELEMETRY`.
 
+## Runtime map
+
+- `modal_app/app.py` — Modal deploy entry (`FooocusWorker`, `sync_models`)
+- `local/ui.py` — Gradio client → `FooocusWorker.generate.remote`
+- `src/` — paths, manifest, params, Fooocus task builder
+
 ## Read first
 
 1. [docs/architecture/OVERVIEW.md](docs/architecture/OVERVIEW.md)

@@ -1,7 +1,11 @@
 # local
 
-Local Gradio UI (CPU) that calls the Modal worker on demand.
+CPU Gradio UI that calls the deployed Modal `FooocusWorker`.
 
-Planned entrypoint: `ui.py`.
+```bash
+cp ../.env.example ../.env
+# modal deploy ../modal_app/app.py
+python ui.py
+```
 
-Not implemented in phase 0.
+Open `http://127.0.0.1:7860` (defaults from `.env`).

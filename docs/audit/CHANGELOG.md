@@ -4,6 +4,13 @@ Newest entries first. Format enforced by skill `audit-trail`.
 
 ## [Unreleased]
 
+### 2026-10-30 — Runtime worker, sync, and local UI
+
+- **What:** Implemented shared path/manifest/params helpers, Modal `FooocusWorker` + `sync_models`, Fooocus headless task runner, and local Gradio UI calling `.remote()`.
+- **Why:** Deliver on-demand FinOps generation path after phase-0 governance.
+- **Paths:** `src/`, `modal_app/app.py`, `modal_app/bootstrap.py`, `local/ui.py`, `tests/test_manifest.py`, `README.md`, `models.txt.example`
+- **Plans:** `.cursor/planx/20261030-2225-runtime-implementation.md`
+
 ### 2026-10-30 — Executive public copy and Website attribution
 
 - **What:** Rewrote public-facing README/CONTRIBUTING/SECURITY/AUTHORS with executive tone; labeled the personal site as Website (not curriculum); aligned architecture/governance wording and Volume name in diagrams.
