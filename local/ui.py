@@ -137,7 +137,10 @@ def list_remote_assets() -> tuple[list[str], list[str]]:
         print("[info] Modal token not configured - using local defaults.")
         return [DEFAULT_CHECKPOINT], ["None", DEFAULT_LORA]
     try:
-        assets = _worker().list_assets.remote()
+        import modal
+
+        # CPU function on purpose: listing models must not wake a GPU worker.
+        assets = modal.Function.from_name(APP_NAME, "list_assets").remote()
         checkpoints = assets.get("checkpoints") or [DEFAULT_CHECKPOINT]
         loras = ["None"] + (assets.get("loras") or [])
         if DEFAULT_LORA not in loras:

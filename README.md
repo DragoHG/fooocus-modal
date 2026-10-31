@@ -34,20 +34,24 @@ modal deploy modal_app/app.py
 python local/ui.py
 ```
 
-Open `http://127.0.0.1:7860`. Use **Presets** in the UI to download or upload a JSON settings file.
+Open `http://127.0.0.1:7860`. Use **Presets** to download or upload a JSON settings file.
+
+The first Generate after idle may take about 1-2 minutes (container start + model load). After that, Lightning jobs are much faster on a warm worker. If a Modal call stays **Running** with no log progress, cancel it.
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `ZERO_TELEMETRY` | `true` | Keep generation media off the Volume |
-| `SCALEDOWN_WINDOW` | `60` | Seconds idle before the GPU stops |
-| `ENABLE_MEMORY_SNAPSHOT` | `true` | Faster cold start |
+| `SCALEDOWN_WINDOW` | `30` | Seconds idle before the GPU stops |
+| `GENERATE_TIMEOUT` | `600` | Max seconds for one generate |
+| `ENABLE_MEMORY_SNAPSHOT` | `false` | Keep off (unsafe with Fooocus CUDA init) |
 | `MODAL_GPUS` | `L4,A10` | GPU preference order |
 | `MODAL_APP_NAME` | `fooocus-modal` | Modal app name |
 
 ## Documentation
 
 - [Architecture](docs/architecture/OVERVIEW.md)
-- [Cold start](docs/architecture/COLD_START.md)
+- [Cold start and FinOps](docs/architecture/COLD_START.md)
+- [Verification](docs/architecture/VERIFICATION.md)
 - [Directory map](docs/architecture/DIRECTORY.md)
 - [ZERO_TELEMETRY](docs/architecture/ZERO_TELEMETRY.md)
 - [Product principles](docs/governance/POLICY.md)

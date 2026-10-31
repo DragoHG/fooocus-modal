@@ -26,21 +26,21 @@ APP_NAME = os.environ.get("MODAL_APP_NAME", "fooocus-modal")
 VOLUME_NAME = os.environ.get("VOLUME_NAME", "fooocus-modal-data")
 FOOOCUS_REPO = os.environ.get("FOOOCUS_REPO", "https://github.com/lllyasviel/Fooocus.git")
 FOOOCUS_REF = os.environ.get("FOOOCUS_REF", "main")
-SCALEDOWN_WINDOW = int(os.environ.get("SCALEDOWN_WINDOW", "60"))
+SCALEDOWN_WINDOW = int(os.environ.get("SCALEDOWN_WINDOW", "30"))
 MODAL_GPUS = [
     g.strip() for g in os.environ.get("MODAL_GPUS", "L4,A10").split(",") if g.strip()
 ]
 ZERO_TELEMETRY = os.environ.get("ZERO_TELEMETRY", "true")
-ENABLE_MEMORY_SNAPSHOT = _truthy("ENABLE_MEMORY_SNAPSHOT", "true")
-ENABLE_GPU_SNAPSHOT = _truthy("ENSURE_GPU_SNAPSHOT", "false") or _truthy(
-    "ENABLE_GPU_SNAPSHOT", "false"
-)
+# OFF by default. CPU memory snapshots run @enter(snap=True) WITHOUT a GPU, and
+# Fooocus init requires CUDA -> RuntimeError + retries that burn money.
+ENABLE_MEMORY_SNAPSHOT = _truthy("ENABLE_MEMORY_SNAPSHOT", "false")
+ENABLE_GPU_SNAPSHOT = _truthy("ENABLE_GPU_SNAPSHOT", "false")
 ENSURE_RUNTIME_ASSETS = os.environ.get("ENSURE_RUNTIME_ASSETS", "true")
+GENERATE_TIMEOUT = int(os.environ.get("GENERATE_TIMEOUT", "600"))
 
 app = modal.App(APP_NAME)
 volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
 
-# Lean GPU image: Fooocus + torch only. No Gradio server process on Modal.
 fooocus_image = (
     modal.Image.from_registry(
         "nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04",
@@ -92,6 +92,25 @@ cpu_image = (
 )
 
 
+def _list_kind(kind: str) -> list[str]:
+    from src.paths import model_dir
+
+    root = model_dir(kind)
+    if not root.exists():
+        return []
+    names: list[str] = []
+    for path in sorted(root.rglob("*")):
+        if path.is_file() and path.suffix.lower() in {
+            ".safetensors",
+            ".ckpt",
+            ".pt",
+            ".pth",
+            ".bin",
+        }:
+            names.append(str(path.relative_to(root)))
+    return names
+
+
 @app.function(
     image=cpu_image,
     volumes={"/vol": volume},
@@ -106,59 +125,53 @@ def sync_models(manifest_text: str) -> list[dict]:
     return report
 
 
+@app.function(
+    image=cpu_image,
+    volumes={"/vol": volume},
+    timeout=120,
+    scaledown_window=15,
+)
+def list_assets() -> dict:
+    """CPU-only listing. Never attach a GPU just to read filenames."""
+    return {
+        "checkpoints": _list_kind("checkpoint"),
+        "loras": _list_kind("lora"),
+        "vae": _list_kind("vae"),
+        "controlnet": _list_kind("controlnet"),
+        "clip_vision": _list_kind("clip_vision"),
+        "inpaint": _list_kind("inpaint"),
+        "upscale": _list_kind("upscale"),
+    }
+
+
 _cls_kwargs: dict = {
     "image": fooocus_image,
     "gpu": MODAL_GPUS or ["L4", "A10"],
     "volumes": {"/vol": volume},
-    "timeout": 60 * 20,
+    "timeout": GENERATE_TIMEOUT,
     "scaledown_window": SCALEDOWN_WINDOW,
     "memory": 32768,
-    "enable_memory_snapshot": ENABLE_MEMORY_SNAPSHOT,
+    "enable_memory_snapshot": False,  # hard-off: see ENABLE_MEMORY_SNAPSHOT note above
+    "min_containers": 0,
+    "buffer_containers": 0,
 }
-if ENABLE_GPU_SNAPSHOT:
-    # Experimental: large SDXL snapshots - off by default; enable via .env if desired.
-    _cls_kwargs["experimental_options"] = {"enable_gpu_snapshot": True}
+# Intentionally ignore ENABLE_MEMORY_SNAPSHOT / GPU snapshot until a CUDA-safe
+# snap path exists. Env flags remain documented as experimental.
+if ENABLE_MEMORY_SNAPSHOT or ENABLE_GPU_SNAPSHOT:
+    print(
+        "[fooocus-modal] WARNING: memory/GPU snapshots requested but disabled "
+        "(Fooocus requires CUDA during enter; CPU snap burns retries)."
+    )
 
 
 @app.cls(**_cls_kwargs)
 class FooocusWorker:
-    @modal.enter(snap=ENABLE_MEMORY_SNAPSHOT)
+    @modal.enter()
     def setup(self) -> None:
-        # When snapshots are on, capture the Fooocus import graph for faster restores.
-        # Checkpoints stay on Volume and load lazily on first generate (lean cold path).
+        # Runs only on a GPU container (class has gpu=...). Init Fooocus here.
         from modal_app.bootstrap import init_fooocus
 
         init_fooocus()
-
-    @modal.method()
-    def list_assets(self) -> dict:
-        from src.paths import model_dir
-
-        def _list(kind: str) -> list[str]:
-            root = model_dir(kind)
-            if not root.exists():
-                return []
-            names: list[str] = []
-            for path in sorted(root.rglob("*")):
-                if path.is_file() and path.suffix.lower() in {
-                    ".safetensors",
-                    ".ckpt",
-                    ".pt",
-                    ".pth",
-                    ".bin",
-                }:
-                    names.append(str(path.relative_to(root)))
-            return names
-
-        return {
-            "checkpoints": _list("checkpoint"),
-            "loras": _list("lora"),
-            "vae": _list("vae"),
-            "controlnet": _list("controlnet"),
-            "clip_vision": _list("clip_vision"),
-            "inpaint": _list("inpaint"),
-            "upscale": _list("upscale"),
-        }
 
     @modal.method()
     def generate(self, params: dict) -> dict:
@@ -167,7 +180,7 @@ class FooocusWorker:
         from src.paths import zero_telemetry_enabled
 
         request = GenerateParams.from_dict(params)
-        result = run_generation(request)
+        result = run_generation(request, timeout_sec=float(max(60, GENERATE_TIMEOUT - 30)))
         if not zero_telemetry_enabled():
             volume.commit()
         return {
@@ -193,6 +206,6 @@ def main(action: str = "sync") -> None:
             print(f"{row['status']:10} {row['kind']:12} {row['path']} ({row['bytes']} bytes)")
         return
     if action == "list":
-        print(FooocusWorker().list_assets.remote())
+        print(list_assets.remote())
         return
     raise SystemExit(f"Unknown action: {action}")

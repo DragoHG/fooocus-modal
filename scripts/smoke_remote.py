@@ -89,14 +89,18 @@ def main() -> int:
     worker = modal.Cls.from_name(APP_NAME, "FooocusWorker")()
     report: list[tuple[str, str, float]] = []
 
-    print("== list_assets ==")
+    print("== list_assets (CPU) ==", flush=True)
     t0 = time.perf_counter()
-    assets = worker.list_assets.remote()
+    assets = modal.Function.from_name(APP_NAME, "list_assets").remote()
     elapsed = time.perf_counter() - t0
     ckpts = assets.get("checkpoints") or []
-    print(f"checkpoints={len(ckpts)} loras={len(assets.get('loras') or [])} controlnet={len(assets.get('controlnet') or [])}")
+    print(
+        f"checkpoints={len(ckpts)} loras={len(assets.get('loras') or [])} "
+        f"controlnet={len(assets.get('controlnet') or [])} ({elapsed:.1f}s)",
+        flush=True,
+    )
     if CKPT not in ckpts:
-        print(f"FAIL: missing checkpoint {CKPT} on Volume; run sync first")
+        print(f"FAIL: missing checkpoint {CKPT} on Volume; run sync first", flush=True)
         return 1
     report.append(("list_assets", "ok", elapsed))
 

@@ -55,6 +55,12 @@ flowchart LR
 
 See `.env.example` for `MODAL_GPUS`, `SCALEDOWN_WINDOW`, `ZERO_TELEMETRY`, and snapshot flags.
 
+## FinOps notes
+
+- Do not enable memory snapshots until a CUDA-safe snap path exists ([COLD_START.md](COLD_START.md))
+- Model listing uses a CPU function; only `generate` should wake the GPU
+- See [VERIFICATION.md](VERIFICATION.md) for the last known-good remote check
+
 ## Non-goals
 
 - Always-on Gradio hosted on GPU

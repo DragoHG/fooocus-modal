@@ -4,6 +4,19 @@ Newest entries first. Format enforced by skill `audit-trail`.
 
 ## [Unreleased]
 
+### 2026-10-30 - Stop GPU burn from snapshots and list_assets
+
+- **What:** Hard-disabled memory snapshots (Fooocus CUDA init fails in CPU snap enter and retries); moved `list_assets` to a CPU Modal function; shortened scale-down; headless Gradio stub; documented cost traps and verification (one Lightning generate OK).
+- **Why:** Logs showed `No CUDA GPUs are available` on snap enter plus GPU wakes just to list files, leaving expensive Running containers.
+- **Paths:** `modal_app/app.py`, `modal_app/bootstrap.py`, `local/ui.py`, `.env.example`, `docs/architecture/COLD_START.md`, `docs/architecture/VERIFICATION.md`, `README.md`
+- **Plans:** `.cursor/planx/20261030-2343-finops-cuda-fix.md`
+
+### 2026-10-30 - Fix prompt-expansion tokenizer on Volume
+
+- **What:** Worker bootstrap now copies Fooocus expansion tokenizer/config sidecars into the Volume path (weights alone were not enough); generation aborts if the Fooocus worker thread dies or times out instead of hanging forever.
+- **Why:** Missing `config.json` crashed the worker mid-generate while the Modal call stayed Running and kept the GPU billed.
+- **Paths:** `modal_app/bootstrap.py`, `src/fooocus_task.py`, `models.txt.example`
+
 ### 2026-10-30 - Studio presets and public product copy
 
 - **What:** Expanded local UI with sampling/guidance controls and JSON preset download/upload; rewrote README, CONTRIBUTING, and governance docs for end-user product language (removed public maintainer-process jargon); added preset unit tests; made Volume path helpers read env at call time.

@@ -21,5 +21,6 @@ controlnet	fooocus_xl_cpds_128.safetensors	https://huggingface.co/lllyasviel/mis
 # --- Inpaint / Upscale / Expansion (optional; some are also fetched at runtime) ---
 inpaint	inpaint_v26.fooocus.patch	https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint_v26.fooocus.patch
 upscale	fooocus_upscaler_s409985e5.bin	https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_upscaler_s409985e5.bin
+# Expansion weights only; tokenizer/config files are copied from the Fooocus image at worker start.
 expansion	pytorch_model.bin	https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_expansion.bin
 vae_approx	xlvaeapp.pth	https://huggingface.co/lllyasviel/misc/resolve/main/xlvaeapp.pth

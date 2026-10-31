@@ -254,7 +254,7 @@ def _to_png_bytes(item: Any) -> bytes:
     raise TypeError(f"Unsupported image result type: {type(item)!r}")
 
 
-def run_generation(params: GenerateParams) -> GenerateResult:
+def run_generation(params: GenerateParams, timeout_sec: float = 900.0) -> GenerateResult:
     import modules.async_worker as worker
 
     started = time.perf_counter()
@@ -265,14 +265,34 @@ def run_generation(params: GenerateParams) -> GenerateResult:
 
     finished = False
     product: list[Any] = []
+    last_progress = time.perf_counter()
     while not finished:
+        if time.perf_counter() - started > timeout_sec:
+            raise TimeoutError(
+                f"Generation timed out after {timeout_sec:.0f}s "
+                "(cancel the Modal call to stop GPU billing)."
+            )
+        # If the Fooocus worker thread died (e.g. missing expansion tokenizer),
+        # AsyncTask never yields "finish" and would burn the GPU forever.
+        thread = getattr(worker, "worker_thread", None) or getattr(worker, "thread", None)
+        if thread is not None and hasattr(thread, "is_alive") and not thread.is_alive():
+            raise RuntimeError(
+                "Fooocus worker thread exited before finishing "
+                "(check Modal logs; often missing prompt-expansion tokenizer files)."
+            )
         time.sleep(0.05)
         if not task.yields:
+            # Soft stall signal: no yields for a long stretch after model load can hang.
+            if time.perf_counter() - last_progress > 600:
+                raise TimeoutError("Generation stalled with no worker progress for 600s.")
             continue
+        last_progress = time.perf_counter()
         flag, payload = task.yields.pop(0)
         if flag == "finish":
             product = payload or task.results or []
             finished = True
+        elif flag == "error":
+            raise RuntimeError(f"Fooocus worker error: {payload}")
 
     images = [_to_png_bytes(x) for x in product]
     paths = [x for x in product if isinstance(x, str)]
